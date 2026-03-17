@@ -264,7 +264,7 @@ fn search_text_respects_patchignore_and_not_gitignore() {
     let gitignored = run_patch_json([
         "search",
         "text",
-        "GITIGNORED_TEXT_MARKER",
+        "GITONLY_KEEP_MARKER",
         "--scope",
         PATCHIGNORE_SCOPE,
         "--json",

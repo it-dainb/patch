@@ -495,6 +495,18 @@ mod tests {
     use super::*;
 
     #[test]
+    fn extract_rust_callee_names_from_simple_call_expression() {
+        let rust = r#"pub fn visible_caller() -> &'static str {
+    visible_api()
+}
+"#;
+
+        let names = extract_callee_names(rust, Lang::Rust, None);
+
+        assert!(names.contains(&"visible_api".to_string()));
+    }
+
+    #[test]
     fn extract_php_callee_names() {
         let php = r"<?php
 function run($svc): void {

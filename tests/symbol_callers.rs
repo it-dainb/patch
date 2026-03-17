@@ -221,7 +221,7 @@ fn symbol_callers_excludes_patchignored_call_sites() {
     let value = run_patch_json([
         "symbol",
         "callers",
-        "callable_target",
+        "visible_api",
         "--scope",
         PATCHIGNORE_SCOPE,
         "--json",
@@ -241,11 +241,11 @@ fn symbol_callers_excludes_patchignored_call_sites() {
         .collect();
 
     assert!(
-        caller_paths.contains(&"visible_calls_callable_target.py"),
+        caller_paths.contains(&"visible_caller.rs"),
         "expected visible caller to remain: {value:#}"
     );
     assert!(
-        !caller_paths.contains(&"ignored-dir/callable_target_dependent.py"),
+        !caller_paths.contains(&"ignored-dir/ignored_caller.rs"),
         "expected ignored caller to be excluded from traversal: {value:#}"
     );
 }

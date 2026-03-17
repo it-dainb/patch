@@ -673,3 +673,33 @@ fn rank_callers(callers: &mut [CallerMatch], scope: &Path, context: Option<&Path
             .then_with(|| a.line.cmp(&b.line))
     });
 }
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use crate::index::bloom::BloomFilterCache;
+
+    use super::find_callers;
+
+    #[test]
+    fn find_callers_detects_simple_rust_fixture_callsite() {
+        let bloom = BloomFilterCache::new();
+        let scope = Path::new("tests/fixtures/patchignore");
+
+        let callers = find_callers("visible_api", scope, &bloom).expect("caller search succeeds");
+
+        assert!(
+            callers
+                .iter()
+                .any(|caller| caller.path.ends_with("visible_caller.rs")),
+            "expected visible_caller.rs in callers: {callers:#?}"
+        );
+        assert!(
+            callers
+                .iter()
+                .all(|caller| !caller.path.ends_with("ignored-dir/ignored_caller.rs")),
+            "expected ignored caller to be excluded: {callers:#?}"
+        );
+    }
+}

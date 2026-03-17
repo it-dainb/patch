@@ -4,6 +4,7 @@ pub mod content;
 pub mod deps;
 pub mod facets;
 pub mod glob;
+pub mod ignore;
 pub mod rank;
 pub mod siblings;
 pub mod strip;
@@ -16,8 +17,6 @@ use std::fmt::Write;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
-
-use ignore::WalkBuilder;
 
 use crate::cache::OutlineCache;
 use crate::error::PatchError;
@@ -98,7 +97,7 @@ pub(crate) fn package_root(path: &Path) -> Option<&Path> {
 
 /// Build a parallel directory walker that searches ALL files except known junk directories.
 /// Does NOT respect .gitignore — ensures gitignored but locally-relevant files are found.
-pub(crate) fn walker(scope: &Path) -> ignore::WalkParallel {
+pub(crate) fn walker(scope: &Path) -> ::ignore::WalkParallel {
     let threads = std::env::var("PATCH_THREADS")
         .ok()
         .and_then(|v| v.parse::<usize>().ok())
@@ -106,7 +105,9 @@ pub(crate) fn walker(scope: &Path) -> ignore::WalkParallel {
             std::thread::available_parallelism().map_or(4, |n| (n.get() / 2).clamp(2, 6))
         });
 
-    WalkBuilder::new(scope)
+    let patchignore = self::ignore::PatchignoreMatcher::from_scope(scope);
+
+    ::ignore::WalkBuilder::new(scope)
         .hidden(false)
         .git_ignore(false)
         .git_global(false)
@@ -114,7 +115,13 @@ pub(crate) fn walker(scope: &Path) -> ignore::WalkParallel {
         .ignore(false)
         .parents(false)
         .threads(threads)
-        .filter_entry(|entry| {
+        .filter_entry(move |entry| {
+            let is_dir = entry.file_type().is_some_and(|ft| ft.is_dir());
+
+            if patchignore.is_ignored(entry.path(), is_dir) {
+                return false;
+            }
+
             if entry.file_type().is_some_and(|ft| ft.is_dir()) {
                 if let Some(name) = entry.file_name().to_str() {
                     return !SKIP_DIRS.contains(&name);

@@ -261,7 +261,7 @@ impl<'a> Iterator for IdentifierIter<'a> {
                         self.pos += 1;
                         continue;
                     }
-                    if b == b'\'' {
+                    if b == b'\'' && !bytes.get(i + 1).is_some_and(|next| is_ident_start(*next)) {
                         self.state = ScanState::StringSingle;
                         self.pos += 1;
                         continue;
@@ -548,6 +548,17 @@ mod tests {
         assert!(idents.contains(&"let"));
         assert!(idents.contains(&"c"));
         assert!(idents.contains(&"d"));
+    }
+
+    #[test]
+    fn test_identifier_extraction_preserves_rust_lifetime_followed_calls() {
+        let code = "pub fn visible_caller() -> &'static str { visible_api() }";
+        let idents: Vec<&str> = extract_identifiers(code).collect();
+
+        assert!(idents.contains(&"visible_caller"));
+        assert!(idents.contains(&"static"));
+        assert!(idents.contains(&"str"));
+        assert!(idents.contains(&"visible_api"));
     }
 
     #[test]
