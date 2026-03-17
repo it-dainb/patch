@@ -3,6 +3,7 @@ pub mod dispatch;
 
 use std::ffi::OsString;
 use std::io::IsTerminal;
+use std::process;
 
 use clap::Parser;
 
@@ -28,7 +29,7 @@ pub fn run() -> Result<(), PatchError> {
                 let output =
                     CommandOutput::from_error(dispatch::command_name(&cli.command), &error);
                 output::write(&output, true, std::io::stdout().is_terminal());
-                Ok(())
+                process::exit(error.exit_code())
             } else {
                 Err(error)
             }

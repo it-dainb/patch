@@ -12,7 +12,12 @@ use crate::output::CommandOutput;
 
 pub fn write(output: &CommandOutput, is_tty: bool) {
     common::emit(
-        &render(output.command, &output.text, &output.diagnostics),
+        &render(
+            output.command,
+            &output.text,
+            &output.next,
+            &output.diagnostics,
+        ),
         is_tty,
     );
 }
@@ -21,16 +26,39 @@ pub fn write(output: &CommandOutput, is_tty: bool) {
 pub fn render(
     command: &str,
     evidence: &str,
+    next: &[crate::output::json::envelope::NextItem],
     diagnostics: &[crate::output::json::envelope::Diagnostic],
 ) -> String {
     let mut rendered = String::new();
-    let _ = write!(rendered, "# {command}\n\n## Evidence\n");
+    let _ = write!(rendered, "# {command}\n\n## Meta\n(none)\n\n## Evidence\n");
     if evidence.is_empty() {
         rendered.push_str("(none)");
     } else {
         rendered.push_str(evidence.trim_end());
     }
+    rendered.push_str("\n\n## Next\n");
+
+    if next.is_empty() {
+        rendered.push_str("(none)");
+    } else {
+        for (index, item) in next.iter().enumerate() {
+            if index > 0 {
+                rendered.push('\n');
+            }
+            let _ = write!(
+                rendered,
+                "- [{}] {} => {}",
+                item.confidence, item.message, item.command
+            );
+        }
+    }
+
     rendered.push_str("\n\n## Diagnostics\n");
+
+    if diagnostics.is_empty() {
+        rendered.push_str("(none)");
+        return rendered;
+    }
 
     for (index, diagnostic) in sort_diagnostics(diagnostics).iter().enumerate() {
         if index > 0 {
@@ -45,6 +73,12 @@ pub fn render(
                 crate::output::json::envelope::DiagnosticLevel::Hint => "hint",
             }
         );
+
+        let _ = write!(rendered, " {}", diagnostic.message);
+
+        if let Some(suggestion) = &diagnostic.suggestion {
+            let _ = write!(rendered, " => {suggestion}");
+        }
     }
 
     rendered
