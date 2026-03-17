@@ -27,14 +27,12 @@ impl CommandOutput {
         diagnostics: Vec<Diagnostic>,
         ok: bool,
     ) -> Self {
-        let next = next_items_from_diagnostics(&diagnostics);
-
         Self {
             command,
             text,
             data,
             meta: Map::new(),
-            next,
+            next: Vec::new(),
             diagnostics,
             ok,
         }
@@ -52,34 +50,6 @@ impl CommandOutput {
             diagnostics: vec![diagnostic],
             ok: false,
         }
-    }
-}
-
-fn next_items_from_diagnostics(diagnostics: &[Diagnostic]) -> Vec<NextItem> {
-    diagnostics
-        .iter()
-        .filter_map(|diagnostic| {
-            let suggestion = diagnostic.suggestion.as_deref()?;
-            let command = normalize_suggestion_command(suggestion)?;
-
-            Some(NextItem {
-                kind: "suggestion".into(),
-                message: command.clone(),
-                command,
-                confidence: "high".into(),
-            })
-        })
-        .collect()
-}
-
-fn normalize_suggestion_command(suggestion: &str) -> Option<String> {
-    let trimmed = suggestion.trim();
-    let command = trimmed.strip_prefix("Try: ").unwrap_or(trimmed).trim();
-
-    if command.is_empty() {
-        None
-    } else {
-        Some(command.to_string())
     }
 }
 
