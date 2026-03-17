@@ -1,5 +1,5 @@
 {
-  "name": "patch",
+  "name": "@it.dainb/patch",
   "version": "0.0.1",
   "description": "Tree-sitter indexed lookups — smart code reading for AI agents",
   "bin": {

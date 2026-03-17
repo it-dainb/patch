@@ -413,7 +413,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "patch"
+name = "pm-patch"
 version = "0.0.1"
 dependencies = [
  "assert_cmd",

@@ -1,5 +1,5 @@
 [package]
-name = "patch"
+name = "pm-patch"
 version = "0.0.1"
 edition = "2021"
 description = "CLI-first code intelligence for AI agents"
