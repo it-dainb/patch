@@ -1,9 +1,11 @@
 use std::process;
 
+use pm_patch::cli;
+
 fn main() {
     configure_thread_pools();
 
-    if let Err(error) = patch::cli::run() {
+    if let Err(error) = cli::run() {
         eprintln!("{error}");
         process::exit(error.exit_code());
     }

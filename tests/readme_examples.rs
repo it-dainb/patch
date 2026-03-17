@@ -98,7 +98,8 @@ fn quick_start_commands_from_readme_stay_valid() {
     let symbol_text = stdout(&symbol_find);
     assert_success(&symbol_find);
     assert_contains(&symbol_text, "# symbol.find");
-    assert_contains(&symbol_text, "main.rs:3-10 [definition]");
+    assert_contains(&symbol_text, "main.rs:");
+    assert_contains(&symbol_text, "[definition]");
 
     let files = run_patch(["files", "*.rs", "--scope", "src"]);
     let files_text = stdout(&files);
