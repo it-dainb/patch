@@ -40,13 +40,14 @@ impl CommandOutput {
 
     #[must_use]
     pub fn from_error(command: &'static str, error: &PatchError) -> Self {
+        let diagnostic = diagnostic_from_error(error);
         Self {
             command,
-            text: text::render(command, "", &[diagnostic_from_error(error)]),
+            text: String::new(),
             data: serde_json::json!({}),
             meta: Map::new(),
             next: Vec::new(),
-            diagnostics: vec![diagnostic_from_error(error)],
+            diagnostics: vec![diagnostic],
             ok: false,
         }
     }
@@ -60,8 +61,22 @@ pub fn write(output: &CommandOutput, json_mode: bool, is_tty: bool) {
     }
 }
 
+pub fn write_error(output: &CommandOutput, json_mode: bool, is_tty: bool) {
+    if json_mode {
+        println!("{}", json::render(output));
+    } else {
+        text::write_error(output, is_tty);
+    }
+}
+
 fn diagnostic_from_error(error: &PatchError) -> Diagnostic {
     match error {
+        PatchError::AlreadyReported { .. } => Diagnostic {
+            level: DiagnosticLevel::Error,
+            code: "already_reported".into(),
+            message: String::new(),
+            suggestion: None,
+        },
         PatchError::NotFound { suggestion, .. } => Diagnostic {
             level: DiagnosticLevel::Error,
             code: "not_found".into(),

@@ -3,6 +3,9 @@ use std::path::PathBuf;
 /// Every error patch can produce. Displayed as user-facing messages with suggestions.
 #[derive(Debug)]
 pub enum PatchError {
+    AlreadyReported {
+        exit_code: i32,
+    },
     Clap {
         message: String,
         exit_code: i32,
@@ -31,6 +34,7 @@ pub enum PatchError {
 impl std::fmt::Display for PatchError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::AlreadyReported { .. } => Ok(()),
             Self::Clap { message, .. } => write!(f, "{message}"),
             Self::NotFound { path, suggestion } => {
                 write!(f, "not found: {}", path.display())?;
@@ -62,6 +66,7 @@ impl PatchError {
     #[must_use]
     pub fn exit_code(&self) -> i32 {
         match self {
+            Self::AlreadyReported { exit_code } => *exit_code,
             Self::Clap { exit_code, .. } => *exit_code,
             Self::NotFound { .. } | Self::IoError { .. } => 2,
             Self::InvalidQuery { .. } | Self::ParseError { .. } => 3,

@@ -30,7 +30,11 @@ pub fn run() -> Result<(), PatchError> {
                 output::write(&output, true, std::io::stdout().is_terminal());
                 Ok(())
             } else {
-                Err(error)
+                let exit_code = error.exit_code();
+                let output =
+                    CommandOutput::from_error(dispatch::command_name(&cli.command), &error);
+                output::write_error(&output, false, std::io::stderr().is_terminal());
+                Err(PatchError::AlreadyReported { exit_code })
             }
         }
     }

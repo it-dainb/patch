@@ -413,7 +413,7 @@ fn invalid_query_text_output_uses_v2_error_sections() {
         "expected error output to render empty next: {text}"
     );
     assert!(
-        text.contains("[error]"),
+        text.contains("## Diagnostics\n- error: invalid query \"4:1\": line range must start at 1 and end at or after the start line [code: invalid_query]"),
         "expected Diagnostics section to include an error entry: {text}"
     );
 }

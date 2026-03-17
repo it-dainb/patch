@@ -2,6 +2,14 @@ use std::io::Write;
 use std::process;
 
 pub fn emit(output: &str, is_tty: bool) {
+    emit_stream(output, is_tty, false);
+}
+
+pub fn emit_error(output: &str, is_tty: bool) {
+    emit_stream(output, is_tty, true);
+}
+
+fn emit_stream(output: &str, is_tty: bool, stderr: bool) {
     let line_count = output.lines().count();
 
     if is_tty && line_count > terminal_height() {
@@ -19,7 +27,11 @@ pub fn emit(output: &str, is_tty: bool) {
         }
     }
 
-    println!("{output}");
+    if stderr {
+        eprintln!("{output}");
+    } else {
+        println!("{output}");
+    }
 }
 
 fn terminal_height() -> usize {
