@@ -1,15 +1,19 @@
 pub mod json;
 pub mod text;
 
-use serde_json::Value;
+use serde_json::{Map, Value};
 
 use crate::error::PatchError;
-use crate::output::json::envelope::{Diagnostic, DiagnosticLevel, Envelope};
+use crate::output::json::envelope::{
+    Diagnostic, DiagnosticLevel, Envelope, EnvelopeData, NextItem,
+};
 
 pub struct CommandOutput {
     pub command: &'static str,
     pub text: String,
     pub data: Value,
+    pub meta: Map<String, Value>,
+    pub next: Vec<NextItem>,
     pub diagnostics: Vec<Diagnostic>,
     pub ok: bool,
 }
@@ -23,16 +27,15 @@ impl CommandOutput {
         diagnostics: Vec<Diagnostic>,
         ok: bool,
     ) -> Self {
-        let diagnostics = if diagnostics.is_empty() {
-            vec![default_hint()]
-        } else {
-            diagnostics
-        };
+        let next = next_from_diagnostics(&diagnostics);
+        let diagnostics = visible_diagnostics(diagnostics);
 
         Self {
             command,
             text,
             data,
+            meta: Map::new(),
+            next,
             diagnostics,
             ok,
         }
@@ -44,6 +47,8 @@ impl CommandOutput {
             command,
             text: text::render(command, "", &[diagnostic_from_error(error)]),
             data: serde_json::json!({}),
+            meta: Map::new(),
+            next: next_from_error(error),
             diagnostics: vec![diagnostic_from_error(error)],
             ok: false,
         }
@@ -55,15 +60,6 @@ pub fn write(output: &CommandOutput, json_mode: bool, is_tty: bool) {
         println!("{}", json::render(output));
     } else {
         text::write(output, is_tty);
-    }
-}
-
-fn default_hint() -> Diagnostic {
-    Diagnostic {
-        level: DiagnosticLevel::Hint,
-        code: "no_diagnostics".into(),
-        message: "no diagnostics".into(),
-        suggestion: None,
     }
 }
 
@@ -108,13 +104,71 @@ fn diagnostic_from_error(error: &PatchError) -> Diagnostic {
     }
 }
 
+fn visible_diagnostics(diagnostics: Vec<Diagnostic>) -> Vec<Diagnostic> {
+    diagnostics
+        .into_iter()
+        .filter(|diagnostic| {
+            !(diagnostic.level == DiagnosticLevel::Hint
+                && diagnostic.code == "no_diagnostics"
+                && diagnostic.message == "no diagnostics"
+                && diagnostic.suggestion.is_none())
+        })
+        .collect()
+}
+
+fn next_from_diagnostics(diagnostics: &[Diagnostic]) -> Vec<NextItem> {
+    diagnostics
+        .iter()
+        .filter_map(|diagnostic| {
+            diagnostic.suggestion.as_ref().map(|command| NextItem {
+                kind: "suggestion".into(),
+                message: diagnostic.message.clone(),
+                command: command.clone(),
+                confidence: "high".into(),
+            })
+        })
+        .collect()
+}
+
+fn next_from_error(error: &PatchError) -> Vec<NextItem> {
+    match error {
+        PatchError::NotFound {
+            suggestion: Some(command),
+            ..
+        } => vec![NextItem {
+            kind: "suggestion".into(),
+            message: error.to_string(),
+            command: command.clone(),
+            confidence: "high".into(),
+        }],
+        _ => Vec::new(),
+    }
+}
+
+fn wrap_data(meta: Map<String, Value>, data: Value) -> EnvelopeData<Value> {
+    let payload = match data {
+        Value::Object(map) => map,
+        other => {
+            let mut map = Map::new();
+            map.insert("value".into(), other);
+            map
+        }
+    };
+
+    EnvelopeData {
+        meta,
+        payload: Value::Object(payload),
+    }
+}
+
 #[must_use]
-pub fn envelope(output: &CommandOutput) -> Envelope<Value> {
+pub fn envelope(output: &CommandOutput) -> Envelope<EnvelopeData<Value>> {
     Envelope {
         command: output.command.to_string(),
-        schema_version: 1,
+        schema_version: 2,
         ok: output.ok,
-        data: output.data.clone(),
+        data: wrap_data(output.meta.clone(), output.data.clone()),
+        next: output.next.clone(),
         diagnostics: output.diagnostics.clone(),
     }
 }
