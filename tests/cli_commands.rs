@@ -2,6 +2,7 @@ use std::ffi::OsStr;
 use std::process::Output;
 
 use assert_cmd::Command;
+use serde_json::Value;
 
 fn run_patch<I, S>(args: I) -> Output
 where
@@ -52,6 +53,16 @@ fn assert_contains(haystack: &str, needle: &str) {
         haystack.contains(needle),
         "expected to find {needle:?} in:\n{haystack}"
     );
+}
+
+fn parse_json_stdout(output: &Output) -> Value {
+    serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
+        panic!(
+            "expected valid json stdout, got error: {error}\nstdout:\n{}\nstderr:\n{}",
+            stdout(output),
+            stderr(output)
+        )
+    })
 }
 
 #[test]
@@ -122,4 +133,38 @@ fn read_section_flag_is_rejected() {
 
     assert_failure(&output);
     assert_contains(&stderr(&output), "unexpected argument '--section'");
+}
+
+#[test]
+fn unknown_command_json_uses_v2_error_envelope() {
+    let output = run_patch(["foo", "--json"]);
+
+    assert_failure(&output);
+    let value = parse_json_stdout(&output);
+    assert_eq!(value["command"], "cli");
+    assert_eq!(value["schema_version"], 2);
+    assert_eq!(value["ok"], false);
+    assert!(value["data"]["meta"].is_object());
+    assert!(value["next"].as_array().is_some_and(|next| next.is_empty()));
+    let diagnostics = value["diagnostics"].as_array().unwrap();
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(diagnostics[0]["level"], "error");
+    assert_eq!(diagnostics[0]["code"], "clap");
+}
+
+#[test]
+fn missing_path_json_uses_v2_error_envelope() {
+    let output = run_patch(["read", "--json"]);
+
+    assert_failure(&output);
+    let value = parse_json_stdout(&output);
+    assert_eq!(value["command"], "cli");
+    assert_eq!(value["schema_version"], 2);
+    assert_eq!(value["ok"], false);
+    assert!(value["data"]["meta"].is_object());
+    assert!(value["next"].as_array().is_some_and(|next| next.is_empty()));
+    let diagnostics = value["diagnostics"].as_array().unwrap();
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(diagnostics[0]["level"], "error");
+    assert_eq!(diagnostics[0]["code"], "clap");
 }
