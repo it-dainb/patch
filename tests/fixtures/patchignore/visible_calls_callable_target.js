@@ -1,0 +1,3 @@
+function visibleCallsCallableTarget() {
+  return callableTarget();
+}

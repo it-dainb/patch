@@ -4,6 +4,8 @@ use std::process::Output;
 use assert_cmd::Command;
 use serde_json::Value;
 
+const PATCHIGNORE_SCOPE: &str = "tests/fixtures/patchignore";
+
 fn run_patch<I, S>(args: I) -> Output
 where
     I: IntoIterator<Item = S>,
@@ -57,6 +59,20 @@ fn files(value: &Value) -> &[Value] {
             serde_json::to_string_pretty(value).expect("json value should serialize")
         )
     })
+}
+
+fn file_paths(value: &Value) -> Vec<&str> {
+    files(value)
+        .iter()
+        .map(|entry| {
+            entry["path"].as_str().unwrap_or_else(|| {
+                panic!(
+                    "expected path string, got:\n{}",
+                    serde_json::to_string_pretty(entry).expect("json value should serialize")
+                )
+            })
+        })
+        .collect()
 }
 
 #[test]
@@ -195,5 +211,36 @@ fn files_no_match_guidance_renders_in_next_section() {
     assert!(
         next.contains("patch files"),
         "expected recovery guidance in Next section: {text}"
+    );
+}
+
+#[test]
+fn files_respects_patchignore_patterns_but_not_gitignore() {
+    let value = run_patch_json(["files", "*.rs", "--scope", PATCHIGNORE_SCOPE, "--json"]);
+    let paths = file_paths(&value);
+
+    assert!(
+        paths.contains(&"gitignored-only.rs"),
+        "expected .gitignore-only file to remain visible: {value:#}"
+    );
+    assert!(
+        paths.contains(&"ignored-dir/reincluded.rs"),
+        "expected negated .patchignore path to be re-included: {value:#}"
+    );
+    assert!(
+        paths.contains(&"nested/root-only.rs"),
+        "expected nested path to survive root-relative ignore rule: {value:#}"
+    );
+    assert!(
+        !paths.contains(&"generated.gen.rs"),
+        "expected ignored glob match to be excluded: {value:#}"
+    );
+    assert!(
+        !paths.contains(&"root-only.rs"),
+        "expected root-relative ignored file to be excluded: {value:#}"
+    );
+    assert!(
+        !paths.contains(&"ignored-dir/ignored_api.rs"),
+        "expected ignored directory file to be excluded: {value:#}"
     );
 }

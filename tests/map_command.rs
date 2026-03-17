@@ -4,6 +4,8 @@ use std::process::Output;
 use assert_cmd::Command;
 use serde_json::Value;
 
+const PATCHIGNORE_SCOPE: &str = "tests/fixtures/patchignore";
+
 fn run_patch<I, S>(args: I) -> Output
 where
     I: IntoIterator<Item = S>,
@@ -160,5 +162,48 @@ fn map_scope_restricts_to_given_directory() {
     assert!(
         scope.contains("src"),
         "expected scope to contain 'src', got: {scope}"
+    );
+}
+
+#[test]
+fn map_respects_patchignore_patterns() {
+    let value = run_patch_json(["map", "--scope", PATCHIGNORE_SCOPE, "--json"]);
+    let tree_text = value["data"]["tree_text"].as_str().unwrap_or_else(|| {
+        panic!(
+            "expected map tree_text string, got:\n{}",
+            serde_json::to_string_pretty(&value).expect("json value should serialize")
+        )
+    });
+    let entry_paths: Vec<&str> = value["data"]["entries"]
+        .as_array()
+        .unwrap_or_else(|| {
+            panic!(
+                "expected map entries array, got:\n{}",
+                serde_json::to_string_pretty(&value).expect("json value should serialize")
+            )
+        })
+        .iter()
+        .filter_map(|entry| entry["path"].as_str())
+        .collect();
+
+    assert!(
+        tree_text.contains("gitignored-only.rs"),
+        "expected .gitignore-only file to remain visible in map: {value:#}"
+    );
+    assert!(
+        tree_text.contains("reincluded.rs") && tree_text.contains("reincluded_symbol"),
+        "expected negated path to remain visible in map: {value:#}"
+    );
+    assert!(
+        !tree_text.contains("ignored-dir/ignored_api.rs"),
+        "expected ignored directory file to be excluded from map: {value:#}"
+    );
+    assert!(
+        !tree_text.contains("generated.gen.rs"),
+        "expected ignored glob match to be excluded from map: {value:#}"
+    );
+    assert!(
+        !entry_paths.contains(&"root-only.rs"),
+        "expected root-relative ignored file to be excluded from map: {value:#}"
     );
 }

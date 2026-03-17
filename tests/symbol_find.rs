@@ -4,6 +4,8 @@ use std::process::Output;
 use assert_cmd::Command;
 use serde_json::Value;
 
+const PATCHIGNORE_SCOPE: &str = "tests/fixtures/patchignore";
+
 fn run_patch<I, S>(args: I) -> Output
 where
     I: IntoIterator<Item = S>,
@@ -248,5 +250,24 @@ fn symbol_find_no_match_guidance_renders_in_next_section() {
     assert!(
         next.contains("patch search text"),
         "expected recovery guidance in Next section: {text}"
+    );
+}
+
+#[test]
+fn symbol_find_excludes_patchignored_definitions() {
+    let value = run_patch_json([
+        "symbol",
+        "find",
+        "ignored_api",
+        "--scope",
+        PATCHIGNORE_SCOPE,
+        "--kind",
+        "definition",
+        "--json",
+    ]);
+
+    assert!(
+        matches(&value).is_empty(),
+        "expected ignored definitions to be excluded from traversal: {value:#}"
     );
 }

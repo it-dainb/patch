@@ -1,0 +1,5 @@
+ignored-dir/*
+!ignored-dir/
+!ignored-dir/reincluded.rs
+*.gen.rs
+/root-only.rs

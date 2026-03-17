@@ -1,0 +1,3 @@
+function ignoredCallableTargetDependent() {
+  return callableTarget();
+}

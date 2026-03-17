@@ -4,6 +4,8 @@ use std::process::Output;
 use assert_cmd::Command;
 use serde_json::Value;
 
+const PATCHIGNORE_SCOPE: &str = "tests/fixtures/patchignore";
+
 fn run_patch<I, S>(args: I) -> Output
 where
     I: IntoIterator<Item = S>,
@@ -211,5 +213,39 @@ fn symbol_callers_reports_warning_for_symbols_without_meaningful_callers_relatio
                     .is_some_and(|command| command.contains("patch symbol find"))
         }),
         "expected follow-up next suggestion for non-meaningful callers relation: {value:#}"
+    );
+}
+
+#[test]
+fn symbol_callers_excludes_patchignored_call_sites() {
+    let value = run_patch_json([
+        "symbol",
+        "callers",
+        "callable_target",
+        "--scope",
+        PATCHIGNORE_SCOPE,
+        "--json",
+    ]);
+    let callers = callers(&value);
+
+    let caller_paths: Vec<&str> = callers
+        .iter()
+        .map(|caller| {
+            caller["path"].as_str().unwrap_or_else(|| {
+                panic!(
+                    "expected caller path string, got:\n{}",
+                    serde_json::to_string_pretty(caller).expect("json value should serialize")
+                )
+            })
+        })
+        .collect();
+
+    assert!(
+        caller_paths.contains(&"visible_calls_callable_target.py"),
+        "expected visible caller to remain: {value:#}"
+    );
+    assert!(
+        !caller_paths.contains(&"ignored-dir/callable_target_dependent.py"),
+        "expected ignored caller to be excluded from traversal: {value:#}"
     );
 }

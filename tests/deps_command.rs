@@ -4,6 +4,8 @@ use std::process::Output;
 use assert_cmd::Command;
 use serde_json::Value;
 
+const PATCHIGNORE_SCOPE: &str = "tests/fixtures/patchignore";
+
 fn run_patch<I, S>(args: I) -> Output
 where
     I: IntoIterator<Item = S>,
@@ -315,5 +317,42 @@ fn deps_external_dependencies_use_stable_ordering() {
     assert_eq!(
         modules, sorted,
         "expected stable external dependency ordering"
+    );
+}
+
+#[test]
+fn deps_accepts_explicit_patchignored_target_but_omits_ignored_dependents() {
+    let value = run_patch_json([
+        "deps",
+        "tests/fixtures/patchignore/ignored-dir/callable_target.py",
+        "--scope",
+        PATCHIGNORE_SCOPE,
+        "--json",
+    ]);
+
+    let used_by_paths: Vec<&str> = used_by(&value)
+        .iter()
+        .map(|entry| {
+            entry["path"].as_str().unwrap_or_else(|| {
+                panic!(
+                    "expected dependent path string, got:\n{}",
+                    serde_json::to_string_pretty(entry).expect("json value should serialize")
+                )
+            })
+        })
+        .collect();
+
+    assert!(
+        value["data"]["path"] == "ignored-dir/callable_target.py"
+            || value["data"]["path"] == "tests/fixtures/patchignore/ignored-dir/callable_target.py",
+        "expected explicit ignored target path to be accepted: {value:#}"
+    );
+    assert!(
+        used_by_paths.contains(&"visible_calls_callable_target.py"),
+        "expected visible dependent to remain in reverse dependencies: {value:#}"
+    );
+    assert!(
+        !used_by_paths.contains(&"ignored-dir/callable_target_dependent.py"),
+        "expected ignored dependent to be excluded from traversal-derived results: {value:#}"
     );
 }

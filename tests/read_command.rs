@@ -224,3 +224,16 @@ fn read_rejects_heading_for_non_markdown_files() {
     assert_contains(&stderr(&output), "heading");
     assert_contains(&stderr(&output), "markdown");
 }
+
+#[test]
+fn read_explicit_patchignored_path_still_succeeds() {
+    let output = run_patch([
+        "read",
+        "tests/fixtures/patchignore/ignored-dir/ignored_api.rs",
+    ]);
+    let text = stdout(&output);
+
+    assert_success(&output);
+    assert_contains(&text, "pub fn ignored_api() -> &'static str");
+    assert_contains(&text, "IGNORED_TEXT_MARKER");
+}

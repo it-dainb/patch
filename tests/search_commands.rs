@@ -4,6 +4,8 @@ use std::process::Output;
 use assert_cmd::Command;
 use serde_json::Value;
 
+const PATCHIGNORE_SCOPE: &str = "tests/fixtures/patchignore";
+
 fn run_patch<I, S>(args: I) -> Output
 where
     I: IntoIterator<Item = S>,
@@ -83,6 +85,27 @@ fn diagnostics(value: &Value) -> &[Value] {
             serde_json::to_string_pretty(value).expect("json value should serialize")
         )
     })
+}
+
+fn match_paths(value: &Value) -> Vec<&str> {
+    value["data"]["matches"]
+        .as_array()
+        .unwrap_or_else(|| {
+            panic!(
+                "expected matches array, got:\n{}",
+                serde_json::to_string_pretty(value).expect("json value should serialize")
+            )
+        })
+        .iter()
+        .map(|entry| {
+            entry["path"].as_str().unwrap_or_else(|| {
+                panic!(
+                    "expected path string, got:\n{}",
+                    serde_json::to_string_pretty(entry).expect("json value should serialize")
+                )
+            })
+        })
+        .collect()
 }
 
 #[test]
@@ -225,5 +248,51 @@ fn search_text_treats_regex_like_input_as_literal_and_hints_about_regex_command(
                     .is_some_and(|command| command.contains("search regex"))
         }),
         "expected regex guidance in next items: {value:#}"
+    );
+}
+
+#[test]
+fn search_text_respects_patchignore_and_not_gitignore() {
+    let ignored = run_patch_json([
+        "search",
+        "text",
+        "IGNORED_TEXT_MARKER",
+        "--scope",
+        PATCHIGNORE_SCOPE,
+        "--json",
+    ]);
+    let gitignored = run_patch_json([
+        "search",
+        "text",
+        "GITIGNORED_TEXT_MARKER",
+        "--scope",
+        PATCHIGNORE_SCOPE,
+        "--json",
+    ]);
+
+    assert!(
+        match_paths(&ignored).is_empty(),
+        "expected ignored text matches to be excluded from traversal: {ignored:#}"
+    );
+    assert!(
+        match_paths(&gitignored).contains(&"gitignored-only.rs"),
+        "expected .gitignore-only file to remain searchable: {gitignored:#}"
+    );
+}
+
+#[test]
+fn search_regex_respects_patchignore() {
+    let value = run_patch_json([
+        "search",
+        "regex",
+        "IGNORED_[A-Z_]+_MARKER",
+        "--scope",
+        PATCHIGNORE_SCOPE,
+        "--json",
+    ]);
+
+    assert!(
+        match_paths(&value).is_empty(),
+        "expected ignored regex matches to be excluded from traversal: {value:#}"
     );
 }
