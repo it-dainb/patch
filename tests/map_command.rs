@@ -93,6 +93,49 @@ fn map_json_returns_typed_data() {
     assert!(meta.get("stability").is_some_and(Value::is_string));
     assert!(meta.get("noise").is_some_and(Value::is_string));
     assert!(meta.get("truncated").is_some_and(Value::is_boolean));
+
+    assert!(
+        data["total_files"].as_u64().unwrap_or(0) > 0,
+        "expected src map to report nonzero total_files: {value:#}"
+    );
+    assert!(
+        data["total_tokens"].as_u64().unwrap_or(0) > 0,
+        "expected src map to report nonzero total_tokens: {value:#}"
+    );
+}
+
+#[test]
+fn map_budget_preserves_total_counts_and_marks_truncation() {
+    let full = run_patch_json(["map", "--scope", "src", "--json"]);
+    let budgeted = run_patch_json(["map", "--scope", "src", "--budget", "400", "--json"]);
+
+    assert_eq!(
+        budgeted["data"]["total_files"], full["data"]["total_files"],
+        "expected budgeted map to preserve total_files: budgeted={budgeted:#} full={full:#}"
+    );
+    assert_eq!(
+        budgeted["data"]["total_tokens"], full["data"]["total_tokens"],
+        "expected budgeted map to preserve total_tokens: budgeted={budgeted:#} full={full:#}"
+    );
+    assert_eq!(
+        budgeted["data"]["meta"]["truncated"], true,
+        "expected budgeted map meta.truncated to be true: {budgeted:#}"
+    );
+
+    let entries = budgeted["data"]["entries"].as_array().unwrap_or_else(|| {
+        panic!(
+            "expected budgeted map entries array, got:\n{}",
+            serde_json::to_string_pretty(&budgeted).expect("json value should serialize")
+        )
+    });
+    assert!(
+        entries.iter().all(|entry| {
+            entry["path"]
+                .as_str()
+                .is_none_or(|path| !path.starts_with("... truncated ("))
+        }),
+        "expected budget truncation marker to stay out of parsed entries: {budgeted:#}"
+    );
 }
 
 #[test]

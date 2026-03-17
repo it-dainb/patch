@@ -11,8 +11,20 @@ use crate::types::{estimate_tokens, FileType};
 /// Generate a structural codebase map.
 /// Code files show symbol names from outline cache.
 /// Non-code files show name + token estimate.
+#[derive(Debug, Clone)]
+pub struct GeneratedMap {
+    pub text: String,
+    pub total_files: usize,
+    pub total_tokens: u64,
+}
+
 #[must_use]
-pub fn generate(scope: &Path, depth: usize, budget: Option<u64>, cache: &OutlineCache) -> String {
+pub fn generate(
+    scope: &Path,
+    depth: usize,
+    budget: Option<u64>,
+    cache: &OutlineCache,
+) -> GeneratedMap {
     let mut tree: BTreeMap<PathBuf, Vec<FileEntry>> = BTreeMap::new();
 
     let walker = WalkBuilder::new(scope)
@@ -83,12 +95,25 @@ pub fn generate(scope: &Path, depth: usize, budget: Option<u64>, cache: &Outline
         });
     }
 
+    let total_files = tree.values().map(Vec::len).sum();
+    let total_tokens = tree
+        .values()
+        .flat_map(|files| files.iter())
+        .map(|entry| entry.tokens)
+        .sum();
+
     let mut out = format!("# Map: {} (depth {})\n", scope.display(), depth);
     format_tree(&tree, Path::new(""), 0, &mut out);
 
-    match budget {
+    let text = match budget {
         Some(b) => crate::budget::apply(&out, b),
         None => out,
+    };
+
+    GeneratedMap {
+        text,
+        total_files,
+        total_tokens,
     }
 }
 

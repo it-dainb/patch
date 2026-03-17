@@ -37,15 +37,16 @@ pub fn run(
 ) -> Result<MapCommandResult, PatchError> {
     let cache = OutlineCache::new();
     let scope = scope.canonicalize().unwrap_or_else(|_| scope.to_path_buf());
-    let full_tree_text = crate::map::generate(&scope, depth, None, &cache);
+    let full_map = crate::map::generate(&scope, depth, None, &cache);
+    let full_tree_text = full_map.text;
     let tree_text = match budget {
         Some(budget) => crate::budget::apply(&full_tree_text, budget),
         None => full_tree_text.clone(),
     };
 
     let entries = parse_map_entries(&tree_text);
-    let total_files = entries.len();
-    let total_tokens: u64 = entries.iter().map(|e| e.tokens).sum();
+    let total_files = full_map.total_files;
+    let total_tokens = full_map.total_tokens;
 
     let truncated = tree_text != full_tree_text;
 
@@ -69,6 +70,9 @@ fn parse_map_entries(tree_text: &str) -> Vec<MapEntry> {
         let trimmed = line.trim();
         // Skip the header line
         if trimmed.starts_with("# Map:") || trimmed.is_empty() {
+            continue;
+        }
+        if trimmed.starts_with("... truncated (") {
             continue;
         }
         // Skip directory lines (ending with /)
