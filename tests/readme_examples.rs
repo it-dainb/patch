@@ -118,6 +118,8 @@ fn read_repo_file(path: &str) -> String {
         .unwrap_or_else(|error| panic!("expected to read {path}, got error: {error}"))
 }
 
+const PATCHIGNORE_SCOPE: &str = "tests/fixtures/patchignore";
+
 #[test]
 fn readme_and_cli_contract_document_v2_output_contract() {
     let readme = read_repo_file("README.md");
@@ -141,8 +143,29 @@ fn readme_and_cli_contract_document_v2_output_contract() {
         "cargo run -- files \"*.definitely-nope\" --scope src --json",
     );
     assert_contains(&readme, "cargo run -- search regex \"(\" --scope src");
+    assert_contains(&readme, ".patchignore");
+    assert_contains(&readme, "active scope root");
+    assert_contains(&readme, ".gitignore is not read");
+    assert_contains(&readme, "read still works for ignored paths");
+    assert_contains(
+        &readme,
+        "deps accepts an ignored target path but filters traversal-derived results",
+    );
+    assert_contains(
+        &readme,
+        "cargo run -- files \"*.rs\" --scope tests/fixtures/patchignore",
+    );
     assert_contains(&contract, "heading_aligned");
     assert_contains(&contract, "first selected line itself");
+    assert_contains(&contract, ".patchignore");
+    assert_contains(&contract, "only one .patchignore at the scope root is read");
+    assert_contains(&contract, "Traversal commands honor that file");
+    assert_contains(&contract, ".gitignore is not read");
+    assert_contains(&contract, "read still accepts an explicit ignored path");
+    assert_contains(
+        &contract,
+        "deps accepts an explicit ignored target path but filters traversal-derived results",
+    );
 }
 
 #[test]
@@ -193,6 +216,26 @@ fn read_command_examples_from_readme_stay_valid() {
     let heading = run_patch(["read", "README.md", "--heading", "## Command families"]);
     assert_success(&heading);
     assert_contains(&stdout(&heading), "## Command families");
+}
+
+#[test]
+fn patchignore_example_from_readme_stays_valid() {
+    let files = run_patch(["files", "*.rs", "--scope", PATCHIGNORE_SCOPE]);
+    let files_text = stdout(&files);
+
+    assert_success(&files);
+    assert_contains(&files_text, "# files");
+    assert_contains(&files_text, "gitignored-only.rs");
+    assert_contains(&files_text, "ignored-dir/reincluded.rs");
+    assert_contains(&files_text, "nested/root-only.rs");
+    assert!(
+        !files_text.contains("generated.gen.rs"),
+        "expected ignored glob match to stay out of README example output:\n{files_text}"
+    );
+    assert!(
+        !files_text.contains("\n- root-only.rs\n"),
+        "expected root-only ignored file to stay out of README example output:\n{files_text}"
+    );
 }
 
 #[test]

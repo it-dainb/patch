@@ -17,6 +17,21 @@ The supported top-level commands are:
 
 There is no query-shorthand mode, no MCP runtime, and no editor/host install flow.
 
+## Scope ignore contract
+
+When a command accepts `--scope <dir>`, patch may read one `.patchignore` file from that active scope root. only one .patchignore at the scope root is read.
+
+patch does not look up parent directories for additional ignore rules, does not merge nested `.patchignore` files, and .gitignore is not read.
+
+Traversal commands honor that file. Traversal commands honor that file: `files`, `symbol find`, `symbol callers`, `search text`, `search regex`, `deps`, and `map`.
+
+Scope behavior stays explicit:
+
+- launch the command with `--scope <dir>` pointing at the directory whose root owns the `.patchignore`
+- root-relative ignore rules are evaluated against that scope root only
+- `read` still accepts an explicit ignored path because it does not depend on traversal; read still accepts an explicit ignored path
+- deps accepts an explicit ignored target path but filters traversal-derived results
+
 ## Shared JSON envelope
 
 Every command supports `--json` and returns the same top-level shape:
@@ -136,6 +151,8 @@ Each command stores its structured payload under `data`.
 - `files`: `files`
 - `deps`: `uses_local`, `uses_external`, `used_by`
 - `map`: `entries`, `total_files`
+
+Traversal-derived command payloads exclude paths filtered by the active scope root `.patchignore`. That filtering affects discovered matches, callers, reverse dependencies, and map entries, but does not change the command names, shared flags, JSON envelope keys, or text section ordering.
 
 ### Markdown heading guidance rule for `read`
 

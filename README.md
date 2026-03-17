@@ -39,6 +39,26 @@ Every command supports:
 
 Scope-aware commands also accept `--scope <dir>`.
 
+## Scope ignore behavior
+
+When you pass `--scope <dir>`, patch reads at most one `.patchignore` file from the active scope root itself. patch does not look in parent directories, and it does not merge multiple ignore files.
+
+Traversal commands honor that scope-root `.patchignore`: `files`, `symbol find`, `symbol callers`, `search text`, `search regex`, `deps`, and `map`.
+
+Supported launch syntax is unchanged: point `--scope` at the directory whose root contains the `.patchignore` file you want honored.
+
+```bash
+cargo run -- files "*.rs" --scope tests/fixtures/patchignore
+```
+
+In that example, only `tests/fixtures/patchignore/.patchignore` is read.
+
+.gitignore is not read.
+
+- read still works for ignored paths because it reads the explicit path you asked for.
+- deps accepts an ignored target path but filters traversal-derived results such as discovered dependents.
+- Root-relative rules stay anchored to the active scope root, so nested paths are not treated as parent-root matches.
+
 ## Quick start
 
 ```bash
@@ -110,6 +130,7 @@ Find files by glob.
 
 ```bash
 cargo run -- files "*.rs" --scope src
+cargo run -- files "*.rs" --scope tests/fixtures/patchignore
 ```
 
 Use `files` to narrow the surface area before reading or searching.
@@ -123,6 +144,8 @@ cargo run -- deps src/main.rs
 ```
 
 Use `deps` before moving, renaming, or heavily restructuring a file.
+
+If the target path is explicit, `deps` still accepts it even when that path matches `.patchignore`, but any traversal-derived results continue to honor the scope-root ignore rules.
 
 ### `map`
 
@@ -335,6 +358,8 @@ For change planning:
 
 1. `deps <path>`
 2. `symbol callers <symbol>`
+
+When a scoped traversal misses an expected path, check the scope root for `.patchignore` before assuming the file is unavailable.
 
 ## Installation
 
