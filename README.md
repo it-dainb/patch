@@ -57,11 +57,11 @@ cargo run -- map --scope src
 Read a file in full, by line range, or by markdown heading.
 
 ```bash
-cargo run -- read README.md --lines 1:20
+cargo run -- read README.md --lines 7:17
 cargo run -- read README.md --heading "## Command families"
 ```
 
-Use `read` when you already know the path and need exact content.
+Use `read` when you already know the path and need exact content. Markdown `--lines` remains valid for arbitrary chunk reads; when the first selected line is itself a recognized heading, patch may also suggest a `--heading` follow-up to read the full section.
 
 ### `symbol find`
 
@@ -143,8 +143,14 @@ patch is designed for agent recovery, not just happy-path demos.
 Text output is optimized for direct consumption in an agent loop:
 
 1. summary header first
-2. evidence block second
-3. diagnostics last
+2. `Meta`
+3. `Evidence`
+4. `Next`
+5. `Diagnostics`
+
+Empty `Next` and `Diagnostics` sections render as `(none)`.
+
+Text errors use the same V2 section layout and render on `stderr` with a non-zero exit status.
 
 Diagnostics are ordered by severity:
 
@@ -161,21 +167,145 @@ JSON output uses a shared envelope across all commands:
 ```json
 {
   "command": "symbol.find",
-  "schema_version": 1,
+  "schema_version": 2,
   "ok": true,
-  "data": {},
+  "data": {
+    "meta": {}
+  },
+  "next": [],
   "diagnostics": []
 }
 ```
 
-Command-specific payloads live under `data`. Shared recovery guidance lives under `diagnostics`. See [`docs/cli-contract.md`](docs/cli-contract.md) for the exact contract.
+Command-specific payloads live under `data`. `data.meta` is always present in V2, and top-level `next` is always present even when empty. Diagnostics contain real warnings, hints, or errors rather than placeholder success entries. See [`docs/cli-contract.md`](docs/cli-contract.md) for the exact contract.
+
+#### Success example
+
+```text
+# symbol.find
+
+## Meta
+- definitions: 1
+- noise: medium
+- query: main
+- scope: /abs/path/to/src
+- stability: medium
+- usages: 1
+
+## Evidence
+symbol find "main" in /abs/path/to/src — 2 matches
+
+- main.rs:5-15 [definition]
+  fn main() {
+
+## Next
+(none)
+
+## Diagnostics
+(none)
+```
+
+#### No-match example with `Next`
+
+```bash
+cargo run -- files "*.definitely-nope" --scope src --json
+```
+
+```json
+{
+  "command": "files",
+  "schema_version": 2,
+  "ok": true,
+  "data": {
+    "meta": {
+      "files": 0,
+      "noise": "low",
+      "pattern": "*.definitely-nope",
+      "scope": "/abs/path/to/src",
+      "stability": "high"
+    },
+    "files": [],
+    "pattern": "*.definitely-nope",
+    "scope": "/abs/path/to/src"
+  },
+  "next": [
+    {
+      "kind": "suggestion",
+      "message": "Try a broader or available file pattern for /abs/path/to/src",
+      "command": "patch files \"*.rs\" --scope /abs/path/to/src",
+      "confidence": "high"
+    }
+  ],
+  "diagnostics": [
+    {
+      "level": "hint",
+      "code": "no_file_matches",
+      "message": "no file matches found for \"*.definitely-nope\""
+    }
+  ]
+}
+```
+
+#### Error example
+
+```bash
+cargo run -- search regex "(" --scope src
+```
+
+```text
+# search.regex
+
+## Meta
+(none)
+
+## Evidence
+(none)
+
+## Next
+(none)
+
+## Diagnostics
+- error: invalid query "(": regex parse error: … [code: invalid_query]
+```
+
+#### Markdown heading-aligned `read` example
+
+```bash
+cargo run -- read README.md --lines 7:17
+```
+
+```text
+# read
+
+## Meta
+- file_kind: markdown
+- heading_aligned: true
+- noise: low
+- path: README.md
+- selector_display: 7:17
+- selector_kind: lines
+- stability: high
+
+## Evidence
+# README.md (11 lines, ~103 tokens) [section]
+
+ 7 │ ## Why patch exists
+ 8 │
+ 9 │ Generic shell tools force agents to compose too many steps:
+
+## Next
+- Read the full markdown section starting at line 7 with --heading (command: patch read "README.md" --heading "## Why patch exists"; confidence: high)
+
+## Diagnostics
+(none)
+```
 
 ## Diagnostics and recovery
 
 patch does not silently reinterpret user intent.
 
 - Wrong selector? Return an error diagnostic.
-- No matches? Return a sparse recovery hint.
+- No matches? Return a sparse recovery hint plus a high-confidence `Next` suggestion when one is available.
 - Probably meant a different command? Return a high-confidence suggestion only.
 
 The CLI prefers explicit nudges over clever fallback behavior because predictable failures are easier for agents to recover from than magical behavior that changes across releases.
