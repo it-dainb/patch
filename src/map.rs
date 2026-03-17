@@ -2,8 +2,6 @@ use std::collections::BTreeMap;
 use std::fmt::Write;
 use std::path::{Path, PathBuf};
 
-use ignore::WalkBuilder;
-
 use crate::cache::OutlineCache;
 use crate::read::{detect_file_type, outline};
 use crate::types::{estimate_tokens, FileType};
@@ -27,21 +25,8 @@ pub fn generate(
 ) -> GeneratedMap {
     let mut tree: BTreeMap<PathBuf, Vec<FileEntry>> = BTreeMap::new();
 
-    let walker = WalkBuilder::new(scope)
-        .hidden(false)
-        .git_ignore(false)
-        .git_global(false)
-        .git_exclude(false)
-        .ignore(false)
-        .parents(false)
-        .filter_entry(|entry| {
-            if entry.file_type().is_some_and(|ft| ft.is_dir()) {
-                if let Some(name) = entry.file_name().to_str() {
-                    return !crate::search::SKIP_DIRS.contains(&name);
-                }
-            }
-            true
-        })
+    let walker = crate::search::walk_builder(scope)
+        .filter_entry(crate::search::project_entry_filter(scope))
         .max_depth(Some(depth + 1))
         .build();
 

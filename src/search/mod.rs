@@ -97,6 +97,39 @@ pub(crate) fn package_root(path: &Path) -> Option<&Path> {
 
 /// Build a parallel directory walker that searches ALL files except known junk directories.
 /// Does NOT respect .gitignore — ensures gitignored but locally-relevant files are found.
+pub(crate) fn walk_builder(scope: &Path) -> ::ignore::WalkBuilder {
+    let mut builder = ::ignore::WalkBuilder::new(scope);
+    builder
+        .hidden(false)
+        .git_ignore(false)
+        .git_global(false)
+        .git_exclude(false)
+        .ignore(false)
+        .parents(false);
+    builder
+}
+
+pub(crate) fn project_entry_filter(
+    scope: &Path,
+) -> impl Fn(&::ignore::DirEntry) -> bool + Send + Sync + 'static {
+    let patchignore = self::ignore::PatchignoreMatcher::from_scope(scope);
+
+    move |entry: &::ignore::DirEntry| {
+        let is_dir = entry.file_type().is_some_and(|ft| ft.is_dir());
+
+        if patchignore.is_ignored(entry.path(), is_dir) {
+            return false;
+        }
+
+        if entry.file_type().is_some_and(|ft| ft.is_dir()) {
+            if let Some(name) = entry.file_name().to_str() {
+                return !SKIP_DIRS.contains(&name);
+            }
+        }
+        true
+    }
+}
+
 pub(crate) fn walker(scope: &Path) -> ::ignore::WalkParallel {
     let threads = std::env::var("PATCH_THREADS")
         .ok()
@@ -105,30 +138,10 @@ pub(crate) fn walker(scope: &Path) -> ::ignore::WalkParallel {
             std::thread::available_parallelism().map_or(4, |n| (n.get() / 2).clamp(2, 6))
         });
 
-    let patchignore = self::ignore::PatchignoreMatcher::from_scope(scope);
-
-    ::ignore::WalkBuilder::new(scope)
-        .hidden(false)
-        .git_ignore(false)
-        .git_global(false)
-        .git_exclude(false)
-        .ignore(false)
-        .parents(false)
+    let mut builder = walk_builder(scope);
+    builder
         .threads(threads)
-        .filter_entry(move |entry| {
-            let is_dir = entry.file_type().is_some_and(|ft| ft.is_dir());
-
-            if patchignore.is_ignored(entry.path(), is_dir) {
-                return false;
-            }
-
-            if entry.file_type().is_some_and(|ft| ft.is_dir()) {
-                if let Some(name) = entry.file_name().to_str() {
-                    return !SKIP_DIRS.contains(&name);
-                }
-            }
-            true
-        })
+        .filter_entry(project_entry_filter(scope))
         .build_parallel()
 }
 

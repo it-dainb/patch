@@ -168,6 +168,12 @@ fn map_scope_restricts_to_given_directory() {
 #[test]
 fn map_respects_patchignore_patterns() {
     let value = run_patch_json(["map", "--scope", PATCHIGNORE_SCOPE, "--json"]);
+    let total_files = value["data"]["total_files"].as_u64().unwrap_or_else(|| {
+        panic!(
+            "expected map total_files number, got:\n{}",
+            serde_json::to_string_pretty(&value).expect("json value should serialize")
+        )
+    });
     let tree_text = value["data"]["tree_text"].as_str().unwrap_or_else(|| {
         panic!(
             "expected map tree_text string, got:\n{}",
@@ -186,6 +192,16 @@ fn map_respects_patchignore_patterns() {
         .filter_map(|entry| entry["path"].as_str())
         .collect();
 
+    assert_eq!(
+        total_files, 12,
+        "expected map totals to exclude patchignored files: {value:#}"
+    );
+    assert_eq!(
+        entry_paths.len(),
+        12,
+        "expected parsed map entries to exclude patchignored files: {value:#}"
+    );
+
     assert!(
         tree_text.contains("gitignored-only.rs"),
         "expected .gitignore-only file to remain visible in map: {value:#}"
@@ -203,7 +219,21 @@ fn map_respects_patchignore_patterns() {
         "expected ignored glob match to be excluded from map: {value:#}"
     );
     assert!(
-        !entry_paths.contains(&"root-only.rs"),
-        "expected root-relative ignored file to be excluded from map: {value:#}"
+        !tree_text.contains("\nroot-only.rs:"),
+        "expected root-relative ignored file to be excluded from top-level map output: {value:#}"
+    );
+    assert!(
+        tree_text.contains("\nnested/\n  root-only.rs:"),
+        "expected nested root-only file to remain visible in map output: {value:#}"
+    );
+    assert!(
+        !entry_paths.contains(&"generated.gen.rs"),
+        "expected ignored glob match to be excluded from map entries: {value:#}"
+    );
+    assert!(
+        !entry_paths.contains(&"ignored_api.rs")
+            && !entry_paths.contains(&"ignored_caller.rs")
+            && !entry_paths.contains(&"ignored_dependent.rs"),
+        "expected ignored directory files to be excluded from map entries: {value:#}"
     );
 }
