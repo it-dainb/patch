@@ -67,9 +67,11 @@ fn map_json_returns_typed_data() {
     let value = run_patch_json(["map", "--scope", "src", "--json"]);
 
     assert_eq!(value["command"], "map");
-    assert_eq!(value["schema_version"], 1);
+    assert_eq!(value["schema_version"], 2);
     assert!(value["ok"].as_bool().unwrap_or(false));
     assert!(value["data"].is_object());
+    assert!(value["data"]["meta"].is_object());
+    assert!(value["next"].is_array());
 
     let data = &value["data"];
     assert!(data["depth"].is_number());
@@ -77,6 +79,20 @@ fn map_json_returns_typed_data() {
     assert!(data["total_tokens"].is_number());
     assert!(data["entries"].is_array());
     assert!(data["tree_text"].is_string());
+
+    let meta = value["data"]["meta"].as_object().unwrap_or_else(|| {
+        panic!(
+            "expected map meta object, got:\n{}",
+            serde_json::to_string_pretty(&value).expect("json value should serialize")
+        )
+    });
+    assert!(meta.get("scope").is_some_and(Value::is_string));
+    assert!(meta.get("depth").is_some_and(Value::is_u64));
+    assert!(meta.get("total_files").is_some_and(Value::is_u64));
+    assert!(meta.get("total_tokens").is_some_and(Value::is_u64));
+    assert!(meta.get("stability").is_some_and(Value::is_string));
+    assert!(meta.get("noise").is_some_and(Value::is_string));
+    assert!(meta.get("truncated").is_some_and(Value::is_boolean));
 }
 
 #[test]

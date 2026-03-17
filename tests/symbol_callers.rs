@@ -81,6 +81,9 @@ fn symbol_callers_returns_callers_in_stable_order() {
     let callers = callers(&value);
 
     assert_eq!(value["command"], "symbol.callers");
+    assert_eq!(value["schema_version"], 2);
+    assert!(value["data"]["meta"].is_object());
+    assert!(value["next"].is_array());
     assert!(
         !callers.is_empty(),
         "expected at least one caller: {value:#}"
@@ -113,6 +116,20 @@ fn symbol_callers_returns_callers_in_stable_order() {
             "expected callers in stable (path, line) order: {pair:?}"
         );
     }
+
+    let meta = value["data"]["meta"].as_object().unwrap_or_else(|| {
+        panic!(
+            "expected symbol.callers meta object, got:\n{}",
+            serde_json::to_string_pretty(&value).expect("json value should serialize")
+        )
+    });
+    assert!(meta.get("query").is_some_and(Value::is_string));
+    assert!(meta.get("scope").is_some_and(Value::is_string));
+    assert!(meta.get("direct_call_sites").is_some_and(Value::is_u64));
+    assert!(meta.get("second_hop_sites").is_some_and(Value::is_u64));
+    assert!(meta.get("stability").is_some_and(Value::is_string));
+    assert!(meta.get("noise").is_some_and(Value::is_string));
+    assert!(meta.get("truncated").is_some_and(Value::is_boolean));
 }
 
 #[test]

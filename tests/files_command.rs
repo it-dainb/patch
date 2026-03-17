@@ -64,7 +64,10 @@ fn files_returns_typed_matches() {
     let value = run_patch_json(["files", "*.rs", "--scope", "src/output", "--json"]);
 
     assert_eq!(value["command"], "files");
+    assert_eq!(value["schema_version"], 2);
     assert_eq!(value["ok"], true);
+    assert!(value["data"]["meta"].is_object());
+    assert!(value["next"].is_array());
 
     let files = files(&value);
     assert!(
@@ -78,6 +81,18 @@ fn files_returns_typed_matches() {
         first["preview"].is_string(),
         "expected preview string: {first:#}"
     );
+
+    let meta = value["data"]["meta"].as_object().unwrap_or_else(|| {
+        panic!(
+            "expected files meta object, got:\n{}",
+            serde_json::to_string_pretty(&value).expect("json value should serialize")
+        )
+    });
+    assert!(meta.get("pattern").is_some_and(Value::is_string));
+    assert!(meta.get("scope").is_some_and(Value::is_string));
+    assert!(meta.get("files").is_some_and(Value::is_u64));
+    assert!(meta.get("stability").is_some_and(Value::is_string));
+    assert!(meta.get("noise").is_some_and(Value::is_string));
 }
 
 #[test]
@@ -97,23 +112,22 @@ fn files_no_match_reports_single_recovery_hint() {
     );
     assert_eq!(files(&value).len(), 0);
 
-    let diagnostics = value["diagnostics"].as_array().unwrap_or_else(|| {
+    let next = value["next"].as_array().unwrap_or_else(|| {
         panic!(
-            "expected diagnostics array, got:\n{}",
+            "expected next array, got:\n{}",
             serde_json::to_string_pretty(&value).expect("json value should serialize")
         )
     });
 
-    let suggestions: Vec<&Value> = diagnostics
-        .iter()
-        .filter(|diagnostic| diagnostic.get("suggestion").is_some())
-        .collect();
-
     assert_eq!(
-        suggestions.len(),
+        next.len(),
         1,
-        "expected exactly one recovery suggestion: {value:#}"
+        "expected exactly one recovery next step: {value:#}"
     );
+    assert_eq!(next[0]["kind"], "suggestion");
+    assert_eq!(next[0]["confidence"], "high");
+    assert!(next[0]["message"].is_string());
+    assert!(next[0]["command"].is_string());
 }
 
 #[test]
@@ -147,12 +161,11 @@ fn files_text_no_match_includes_single_next_step_hint() {
     let text = stdout(&output);
 
     assert_success(&output);
+    assert!(text.contains("## Next"), "expected next block: {text}");
     assert!(
-        text.contains("## Diagnostics"),
-        "expected diagnostics block: {text}"
-    );
-    assert!(
-        text.contains("Try:") || text.contains("try:"),
+        text.contains("patch files")
+            || text.contains("patch search")
+            || text.contains("patch symbol"),
         "expected a next-step suggestion in text output: {text}"
     );
 }

@@ -71,7 +71,10 @@ fn search_text_returns_typed_matches() {
     ]);
 
     assert_eq!(value["command"], "search.text");
+    assert_eq!(value["schema_version"], 2);
     assert_eq!(value["ok"], true);
+    assert!(value["data"]["meta"].is_object());
+    assert!(value["next"].is_array());
 
     let matches = value["data"]["matches"].as_array().unwrap_or_else(|| {
         panic!(
@@ -88,6 +91,19 @@ fn search_text_returns_typed_matches() {
     assert!(first["path"].is_string(), "expected path string: {first:#}");
     assert!(first["line"].is_u64(), "expected line number: {first:#}");
     assert!(first["text"].is_string(), "expected text string: {first:#}");
+
+    let meta = value["data"]["meta"].as_object().unwrap_or_else(|| {
+        panic!(
+            "expected search.text meta object, got:\n{}",
+            serde_json::to_string_pretty(&value).expect("json value should serialize")
+        )
+    });
+    assert!(meta.get("query").is_some_and(Value::is_string));
+    assert!(meta.get("scope").is_some_and(Value::is_string));
+    assert!(meta.get("matches").is_some_and(Value::is_u64));
+    assert!(meta.get("mode").is_some_and(Value::is_string));
+    assert!(meta.get("stability").is_some_and(Value::is_string));
+    assert!(meta.get("noise").is_some_and(Value::is_string));
 }
 
 #[test]
@@ -102,7 +118,10 @@ fn search_regex_returns_typed_matches() {
     ]);
 
     assert_eq!(value["command"], "search.regex");
+    assert_eq!(value["schema_version"], 2);
     assert_eq!(value["ok"], true);
+    assert!(value["data"]["meta"].is_object());
+    assert!(value["next"].is_array());
 
     let matches = value["data"]["matches"].as_array().unwrap_or_else(|| {
         panic!(
@@ -115,6 +134,19 @@ fn search_regex_returns_typed_matches() {
         !matches.is_empty(),
         "expected at least one regex search match: {value:#}"
     );
+
+    let meta = value["data"]["meta"].as_object().unwrap_or_else(|| {
+        panic!(
+            "expected search.regex meta object, got:\n{}",
+            serde_json::to_string_pretty(&value).expect("json value should serialize")
+        )
+    });
+    assert!(meta.get("query").is_some_and(Value::is_string));
+    assert!(meta.get("scope").is_some_and(Value::is_string));
+    assert!(meta.get("matches").is_some_and(Value::is_u64));
+    assert!(meta.get("mode").is_some_and(Value::is_string));
+    assert!(meta.get("stability").is_some_and(Value::is_string));
+    assert!(meta.get("noise").is_some_and(Value::is_string));
 }
 
 #[test]
@@ -123,7 +155,10 @@ fn search_regex_invalid_pattern_returns_single_error_diagnostic() {
     let diagnostics = diagnostics(&value);
 
     assert_eq!(value["command"], "search.regex");
+    assert_eq!(value["schema_version"], 2);
     assert_eq!(value["ok"], false);
+    assert!(value["data"]["meta"].is_object());
+    assert!(value["next"].is_array());
     assert_eq!(diagnostics.len(), 1, "expected one diagnostic: {value:#}");
     assert_eq!(diagnostics[0]["level"], "error");
 }
@@ -144,7 +179,12 @@ fn search_text_treats_regex_like_input_as_literal_and_hints_about_regex_command(
             serde_json::to_string_pretty(&value).expect("json value should serialize")
         )
     });
-    let diagnostics = diagnostics(&value);
+    let next = value["next"].as_array().unwrap_or_else(|| {
+        panic!(
+            "expected next array, got:\n{}",
+            serde_json::to_string_pretty(&value).expect("json value should serialize")
+        )
+    });
 
     assert_eq!(value["command"], "search.text");
     assert!(
@@ -152,12 +192,12 @@ fn search_text_treats_regex_like_input_as_literal_and_hints_about_regex_command(
         "expected regex-like literal to stay literal: {value:#}"
     );
     assert!(
-        diagnostics.iter().any(|diagnostic| {
-            diagnostic["level"] == "hint"
-                && diagnostic["suggestion"]
+        next.iter().any(|item| {
+            item["kind"] == "suggestion"
+                && item["command"]
                     .as_str()
-                    .is_some_and(|suggestion| suggestion.contains("search regex"))
+                    .is_some_and(|command| command.contains("search regex"))
         }),
-        "expected regex guidance hint: {value:#}"
+        "expected regex guidance in next items: {value:#}"
     );
 }

@@ -93,7 +93,10 @@ fn deps_returns_typed_reverse_dependency_data() {
     let value = run_patch_json(["deps", "src/commands/deps.rs", "--scope", "src", "--json"]);
 
     assert_eq!(value["command"], "deps");
+    assert_eq!(value["schema_version"], 2);
     assert_eq!(value["ok"], true);
+    assert!(value["data"]["meta"].is_object());
+    assert!(value["next"].is_array());
     assert_eq!(value["data"]["path"], "commands/deps.rs");
     assert!(
         value["data"]["scope"].is_string(),
@@ -171,6 +174,20 @@ fn deps_returns_typed_reverse_dependency_data() {
         "expected caller symbol list: {:#}",
         callers[0]
     );
+
+    let meta = value["data"]["meta"].as_object().unwrap_or_else(|| {
+        panic!(
+            "expected deps meta object, got:\n{}",
+            serde_json::to_string_pretty(&value).expect("json value should serialize")
+        )
+    });
+    assert!(meta.get("path").is_some_and(Value::is_string));
+    assert!(meta.get("local_uses").is_some_and(Value::is_u64));
+    assert!(meta.get("external_uses").is_some_and(Value::is_u64));
+    assert!(meta.get("dependents").is_some_and(Value::is_u64));
+    assert!(meta.get("stability").is_some_and(Value::is_string));
+    assert!(meta.get("noise").is_some_and(Value::is_string));
+    assert!(meta.get("truncated").is_some_and(Value::is_boolean));
 }
 
 #[test]
@@ -212,10 +229,13 @@ fn deps_rejects_symbol_like_input_without_path_interpretation() {
     });
 
     assert_eq!(value["command"], "deps");
+    assert_eq!(value["schema_version"], 2);
     assert_eq!(
         value["ok"], false,
         "expected invalid deps path to be reported as an error"
     );
+    assert!(value["data"]["meta"].is_object());
+    assert!(value["next"].is_array());
 
     let diagnostics = diagnostics(&value);
     assert_eq!(
@@ -231,8 +251,8 @@ fn deps_rejects_symbol_like_input_without_path_interpretation() {
         "expected missing-path diagnostic mentioning the exact input: {value:#}"
     );
     assert!(
-        diagnostics[0]["suggestion"].is_null(),
-        "expected no symbol fallback suggestion for deps path input: {value:#}"
+        value["next"].as_array().is_some_and(|next| next.is_empty()),
+        "expected no fallback next command for deps path input: {value:#}"
     );
 }
 
