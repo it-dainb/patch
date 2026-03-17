@@ -304,7 +304,7 @@ fn next_items_follow_v2_object_shape() {
             "symbol.find",
         ),
         (
-            vec!["read", "README.md", "--lines", "10:14", "--json"],
+            vec!["read", "README.md", "--lines", "19:22", "--json"],
             "read",
         ),
     ];

@@ -9,17 +9,31 @@ use serde_json::{json, Map, Value};
 pub fn run(args: &SearchTextArgs) -> Result<CommandOutput, PatchError> {
     let result = search::run_text(&args.query, &args.scope, args.budget)?;
     let next = next_for_search(&result);
+    let diagnostics = diagnostics_without_suggestions(&result.diagnostics);
     let mut output = CommandOutput::with_parts(
         "search.text",
         text::search::render(&result),
         json::search::render(&result),
-        result.diagnostics,
+        diagnostics,
         true,
     );
     output.meta = meta_for_search(&result.data);
     output.next = next;
 
     Ok(output)
+}
+
+fn diagnostics_without_suggestions(
+    diagnostics: &[crate::output::json::envelope::Diagnostic],
+) -> Vec<crate::output::json::envelope::Diagnostic> {
+    diagnostics
+        .iter()
+        .cloned()
+        .map(|mut diagnostic| {
+            diagnostic.suggestion = None;
+            diagnostic
+        })
+        .collect()
 }
 
 fn next_for_search(result: &search::SearchCommandResult) -> Vec<NextItem> {

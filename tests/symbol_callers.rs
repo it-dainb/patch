@@ -185,6 +185,12 @@ fn symbol_callers_reports_warning_for_symbols_without_meaningful_callers_relatio
             serde_json::to_string_pretty(&value).expect("json value should serialize")
         )
     });
+    let next = value["next"].as_array().unwrap_or_else(|| {
+        panic!(
+            "expected next array, got:\n{}",
+            serde_json::to_string_pretty(&value).expect("json value should serialize")
+        )
+    });
 
     assert!(
         callers.is_empty(),
@@ -195,5 +201,15 @@ fn symbol_callers_reports_warning_for_symbols_without_meaningful_callers_relatio
             .iter()
             .any(|diagnostic| diagnostic["level"] == "warning"),
         "expected warning diagnostic for non-meaningful callers relation: {value:#}"
+    );
+    assert!(
+        next.iter().any(|item| {
+            item["kind"] == "suggestion"
+                && item["confidence"] == "high"
+                && item["command"]
+                    .as_str()
+                    .is_some_and(|command| command.contains("patch symbol find"))
+        }),
+        "expected follow-up next suggestion for non-meaningful callers relation: {value:#}"
     );
 }
