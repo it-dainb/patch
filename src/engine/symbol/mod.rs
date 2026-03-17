@@ -70,6 +70,7 @@ pub struct SymbolCallersData {
 #[derive(Debug, Clone)]
 pub struct SymbolCallersCommandResult {
     pub data: SymbolCallersData,
+    pub truncated: bool,
     pub diagnostics: Vec<Diagnostic>,
 }
 
@@ -198,10 +199,14 @@ pub fn run_callers(
                 })
                 .collect(),
         },
+        truncated: false,
         diagnostics: callers_diagnostics(query, &scope)?,
     };
 
     if let Some(budget) = budget {
+        let original_callers = command_result.data.callers.len();
+        let original_impact = command_result.data.impact.len();
+
         while serde_json::to_string(&command_result.data)
             .expect("symbol callers data should serialize")
             .len() as u64
@@ -219,6 +224,9 @@ pub fn run_callers(
         {
             command_result.data.callers.pop();
         }
+
+        command_result.truncated = command_result.data.callers.len() < original_callers
+            || command_result.data.impact.len() < original_impact;
     }
 
     Ok(command_result)

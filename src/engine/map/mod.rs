@@ -26,6 +26,7 @@ pub struct MapData {
 #[derive(Debug, Clone)]
 pub struct MapCommandResult {
     pub data: MapData,
+    pub truncated: bool,
     pub diagnostics: Vec<Diagnostic>,
 }
 
@@ -36,11 +37,17 @@ pub fn run(
 ) -> Result<MapCommandResult, PatchError> {
     let cache = OutlineCache::new();
     let scope = scope.canonicalize().unwrap_or_else(|_| scope.to_path_buf());
-    let tree_text = crate::map::generate(&scope, depth, budget, &cache);
+    let full_tree_text = crate::map::generate(&scope, depth, None, &cache);
+    let tree_text = match budget {
+        Some(budget) => crate::budget::apply(&full_tree_text, budget),
+        None => full_tree_text.clone(),
+    };
 
     let entries = parse_map_entries(&tree_text);
     let total_files = entries.len();
     let total_tokens: u64 = entries.iter().map(|e| e.tokens).sum();
+
+    let truncated = tree_text != full_tree_text;
 
     Ok(MapCommandResult {
         data: MapData {
@@ -51,6 +58,7 @@ pub fn run(
             entries,
             tree_text,
         },
+        truncated,
         diagnostics: Vec::new(),
     })
 }

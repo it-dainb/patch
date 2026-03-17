@@ -357,6 +357,64 @@ pub fn detect_file_type(path: &Path) -> FileType {
     }
 }
 
+pub fn is_markdown_heading_line(path: &Path, line_number: usize) -> Result<bool, PatchError> {
+    if !matches!(detect_file_type(path), FileType::Markdown) {
+        return Ok(false);
+    }
+
+    let buf = fs::read(path).map_err(|source| PatchError::IoError {
+        path: path.to_path_buf(),
+        source,
+    })?;
+
+    Ok(markdown_heading_line_from_bytes(&buf, line_number))
+}
+
+fn markdown_heading_line_from_bytes(buf: &[u8], line_number: usize) -> bool {
+    if line_number == 0 {
+        return false;
+    }
+
+    let mut line_offsets: Vec<usize> = vec![0];
+    for pos in memchr::memchr_iter(b'\n', buf) {
+        line_offsets.push(pos + 1);
+    }
+
+    if line_number > line_offsets.len() {
+        return false;
+    }
+
+    let mut in_code_block = false;
+    for (line_idx, &offset) in line_offsets.iter().enumerate() {
+        let current_line = line_idx + 1;
+        let line_end = if line_idx + 1 < line_offsets.len() {
+            line_offsets[line_idx + 1] - 1
+        } else {
+            buf.len()
+        };
+
+        let Ok(line_str) = std::str::from_utf8(&buf[offset..line_end]) else {
+            continue;
+        };
+
+        let trimmed = line_str.trim_end();
+        if trimmed.starts_with("```") {
+            in_code_block = !in_code_block;
+        }
+
+        if current_line == line_number {
+            return !in_code_block && is_markdown_heading(trimmed);
+        }
+    }
+
+    false
+}
+
+fn is_markdown_heading(line: &str) -> bool {
+    let level = line.chars().take_while(|&c| c == '#').count();
+    level > 0 && line[level..].starts_with(' ')
+}
+
 fn file_type_from_name(path: &Path) -> FileType {
     match path.file_name().and_then(|n| n.to_str()) {
         Some("Dockerfile" | "Containerfile") => FileType::Code(Lang::Dockerfile),
