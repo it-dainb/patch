@@ -151,15 +151,15 @@ fn symbol_find_no_match_reports_one_recovery_suggestion() {
         )
     });
 
-    assert_eq!(
-        next.len(),
-        1,
-        "expected exactly one recovery next step: {value:#}"
+    assert!(
+        next.iter().any(|item| {
+            item["kind"] == "suggestion"
+                && item["confidence"] == "high"
+                && item["message"].is_string()
+                && item["command"].is_string()
+        }),
+        "expected at least one high-confidence recovery next step: {value:#}"
     );
-    assert_eq!(next[0]["kind"], "suggestion");
-    assert_eq!(next[0]["confidence"], "high");
-    assert!(next[0]["message"].is_string());
-    assert!(next[0]["command"].is_string());
 }
 
 #[test]

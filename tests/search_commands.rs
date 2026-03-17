@@ -34,6 +34,16 @@ fn assert_success(output: &Output) {
     );
 }
 
+fn assert_failure(output: &Output) {
+    assert!(
+        !output.status.success(),
+        "expected failure, got status {:?}\nstdout:\n{}\nstderr:\n{}",
+        output.status.code(),
+        stdout(output),
+        stderr(output)
+    );
+}
+
 fn run_patch_json<I, S>(args: I) -> Value
 where
     I: IntoIterator<Item = S>,
@@ -41,6 +51,22 @@ where
 {
     let output = run_patch(args);
     assert_success(&output);
+    serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
+        panic!(
+            "expected valid json stdout, got error: {error}\nstdout:\n{}\nstderr:\n{}",
+            stdout(&output),
+            stderr(&output)
+        )
+    })
+}
+
+fn run_patch_json_failure<I, S>(args: I) -> Value
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    let output = run_patch(args);
+    assert_failure(&output);
     serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
         panic!(
             "expected valid json stdout, got error: {error}\nstdout:\n{}\nstderr:\n{}",
@@ -151,7 +177,7 @@ fn search_regex_returns_typed_matches() {
 
 #[test]
 fn search_regex_invalid_pattern_returns_single_error_diagnostic() {
-    let value = run_patch_json(["search", "regex", "(", "--scope", "src", "--json"]);
+    let value = run_patch_json_failure(["search", "regex", "(", "--scope", "src", "--json"]);
     let diagnostics = diagnostics(&value);
 
     assert_eq!(value["command"], "search.regex");

@@ -34,6 +34,16 @@ fn assert_success(output: &Output) {
     );
 }
 
+fn assert_failure(output: &Output) {
+    assert!(
+        !output.status.success(),
+        "expected failure, got status {:?}\nstdout:\n{}\nstderr:\n{}",
+        output.status.code(),
+        stdout(output),
+        stderr(output)
+    );
+}
+
 fn run_patch_json<I, S>(args: I) -> Value
 where
     I: IntoIterator<Item = S>,
@@ -41,6 +51,22 @@ where
 {
     let output = run_patch(args);
     assert_success(&output);
+    serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
+        panic!(
+            "expected valid json stdout, got error: {error}\nstdout:\n{}\nstderr:\n{}",
+            stdout(&output),
+            stderr(&output)
+        )
+    })
+}
+
+fn run_patch_json_failure<I, S>(args: I) -> Value
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    let output = run_patch(args);
+    assert_failure(&output);
     serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
         panic!(
             "expected valid json stdout, got error: {error}\nstdout:\n{}\nstderr:\n{}",
@@ -217,16 +243,7 @@ fn deps_reverse_dependencies_use_stable_path_ordering() {
 
 #[test]
 fn deps_rejects_symbol_like_input_without_path_interpretation() {
-    let output = run_patch(["deps", "render", "--scope", "src", "--json"]);
-
-    assert_success(&output);
-    let value: Value = serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
-        panic!(
-            "expected valid json stdout, got error: {error}\nstdout:\n{}\nstderr:\n{}",
-            stdout(&output),
-            stderr(&output)
-        )
-    });
+    let value = run_patch_json_failure(["deps", "render", "--scope", "src", "--json"]);
 
     assert_eq!(value["command"], "deps");
     assert_eq!(value["schema_version"], 2);

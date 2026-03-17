@@ -54,6 +54,16 @@ where
     parse_json_stdout(&output)
 }
 
+fn run_patch_json_failure<I, S>(args: I) -> Value
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    let output = run_patch(args);
+    assert_failure(&output);
+    parse_json_stdout(&output)
+}
+
 fn parse_json_stdout(output: &Output) -> Value {
     serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
         panic!(
@@ -353,10 +363,7 @@ fn text_output_renders_none_for_empty_next_and_diagnostics() {
 
 #[test]
 fn json_errors_use_schema_version_2() {
-    let output = run_patch(["search", "regex", "(", "--scope", "src", "--json"]);
-    assert_failure(&output);
-
-    let value = parse_json_stdout(&output);
+    let value = run_patch_json_failure(["search", "regex", "(", "--scope", "src", "--json"]);
     assert_v2_envelope(&value, "search.regex");
     assert_eq!(
         value["ok"], false,
@@ -374,10 +381,7 @@ fn json_errors_use_schema_version_2() {
 
 #[test]
 fn json_errors_emit_empty_next_and_meta_objects_when_needed() {
-    let output = run_patch(["deps", "render", "--scope", "src", "--json"]);
-    assert_success(&output);
-
-    let value = parse_json_stdout(&output);
+    let value = run_patch_json_failure(["deps", "render", "--scope", "src", "--json"]);
     assert_v2_envelope(&value, "deps");
     assert_eq!(
         value["ok"], false,

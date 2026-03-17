@@ -67,6 +67,30 @@ where
     })
 }
 
+fn assert_has_high_confidence_heading_suggestion(next: &[Value], context: &Value) {
+    assert!(
+        next.iter().any(|item| {
+            item["kind"] == "suggestion"
+                && item["confidence"] == "high"
+                && item["command"]
+                    .as_str()
+                    .is_some_and(|command| command.contains("--heading"))
+        }),
+        "expected heading-aligned markdown range to suggest --heading follow-up: {context:#}"
+    );
+}
+
+fn assert_has_no_heading_suggestion(next: &[Value], context: &Value) {
+    assert!(
+        next.iter().all(|item| {
+            item["command"]
+                .as_str()
+                .is_none_or(|command| !command.contains("--heading"))
+        }),
+        "expected no heading suggestion for this selected range: {context:#}"
+    );
+}
+
 #[test]
 fn read_path_renders_file_contents() {
     let output = run_patch(["read", "src/commands/read.rs"]);
@@ -135,7 +159,7 @@ fn read_heading_renders_markdown_section() {
 
 #[test]
 fn read_markdown_lines_suggests_heading_when_heading_aligned() {
-    let value = run_patch_json(["read", "README.md", "--lines", "10:14", "--json"]);
+    let value = run_patch_json(["read", "README.md", "--lines", "19:22", "--json"]);
 
     let next = value["next"].as_array().unwrap_or_else(|| {
         panic!(
@@ -143,21 +167,12 @@ fn read_markdown_lines_suggests_heading_when_heading_aligned() {
             serde_json::to_string_pretty(&value).expect("json value should serialize")
         )
     });
-    assert!(
-        next.iter().any(|item| {
-            item["kind"] == "suggestion"
-                && item["confidence"] == "high"
-                && item["command"]
-                    .as_str()
-                    .is_some_and(|command| command.contains("--heading"))
-        }),
-        "expected heading-aligned markdown range to suggest --heading follow-up: {value:#}"
-    );
+    assert_has_high_confidence_heading_suggestion(next, &value);
 }
 
 #[test]
 fn read_markdown_lines_without_heading_alignment_has_no_heading_hint() {
-    let value = run_patch_json(["read", "README.md", "--lines", "11:14", "--json"]);
+    let value = run_patch_json(["read", "README.md", "--lines", "21:24", "--json"]);
 
     let next = value["next"].as_array().unwrap_or_else(|| {
         panic!(
@@ -165,19 +180,12 @@ fn read_markdown_lines_without_heading_alignment_has_no_heading_hint() {
             serde_json::to_string_pretty(&value).expect("json value should serialize")
         )
     });
-    assert!(
-        next.iter().all(|item| {
-            item["command"]
-                .as_str()
-                .is_none_or(|command| !command.contains("--heading"))
-        }),
-        "expected no heading suggestion when range starts inside body text: {value:#}"
-    );
+    assert_has_no_heading_suggestion(next, &value);
 }
 
 #[test]
 fn read_markdown_lines_starting_before_heading_has_no_heading_hint() {
-    let value = run_patch_json(["read", "README.md", "--lines", "9:12", "--json"]);
+    let value = run_patch_json(["read", "README.md", "--lines", "17:21", "--json"]);
 
     let next = value["next"].as_array().unwrap_or_else(|| {
         panic!(
@@ -185,14 +193,7 @@ fn read_markdown_lines_starting_before_heading_has_no_heading_hint() {
             serde_json::to_string_pretty(&value).expect("json value should serialize")
         )
     });
-    assert!(
-        next.iter().all(|item| {
-            item["command"]
-                .as_str()
-                .is_none_or(|command| !command.contains("--heading"))
-        }),
-        "expected no heading suggestion when selected range starts before heading: {value:#}"
-    );
+    assert_has_no_heading_suggestion(next, &value);
 }
 
 #[test]
