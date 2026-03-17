@@ -27,15 +27,12 @@ impl CommandOutput {
         diagnostics: Vec<Diagnostic>,
         ok: bool,
     ) -> Self {
-        let next = next_from_diagnostics(&diagnostics);
-        let diagnostics = visible_diagnostics(diagnostics);
-
         Self {
             command,
             text,
             data,
             meta: Map::new(),
-            next,
+            next: Vec::new(),
             diagnostics,
             ok,
         }
@@ -48,7 +45,7 @@ impl CommandOutput {
             text: text::render(command, "", &[diagnostic_from_error(error)]),
             data: serde_json::json!({}),
             meta: Map::new(),
-            next: next_from_error(error),
+            next: Vec::new(),
             diagnostics: vec![diagnostic_from_error(error)],
             ok: false,
         }
@@ -101,47 +98,6 @@ fn diagnostic_from_error(error: &PatchError) -> Diagnostic {
             message: error.to_string(),
             suggestion: None,
         },
-    }
-}
-
-fn visible_diagnostics(diagnostics: Vec<Diagnostic>) -> Vec<Diagnostic> {
-    diagnostics
-        .into_iter()
-        .filter(|diagnostic| {
-            !(diagnostic.level == DiagnosticLevel::Hint
-                && diagnostic.code == "no_diagnostics"
-                && diagnostic.message == "no diagnostics"
-                && diagnostic.suggestion.is_none())
-        })
-        .collect()
-}
-
-fn next_from_diagnostics(diagnostics: &[Diagnostic]) -> Vec<NextItem> {
-    diagnostics
-        .iter()
-        .filter_map(|diagnostic| {
-            diagnostic.suggestion.as_ref().map(|command| NextItem {
-                kind: "suggestion".into(),
-                message: diagnostic.message.clone(),
-                command: command.clone(),
-                confidence: "high".into(),
-            })
-        })
-        .collect()
-}
-
-fn next_from_error(error: &PatchError) -> Vec<NextItem> {
-    match error {
-        PatchError::NotFound {
-            suggestion: Some(command),
-            ..
-        } => vec![NextItem {
-            kind: "suggestion".into(),
-            message: error.to_string(),
-            command: command.clone(),
-            confidence: "high".into(),
-        }],
-        _ => Vec::new(),
     }
 }
 
