@@ -175,7 +175,7 @@ fn read_json(
     let selected = match selector {
         JsonSelector::Full => parsed,
         JsonSelector::Key(key) => json::resolve_path(&parsed, &key)
-            .map(|resolved| resolved.clone())
+            .cloned()
             .map_err(|error| PatchError::ParseError {
                 path: path.to_path_buf(),
                 reason: error.to_string(),
