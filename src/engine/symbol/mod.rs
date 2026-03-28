@@ -80,7 +80,7 @@ pub fn run(
     kind: Option<SymbolFindKind>,
     budget: Option<u64>,
 ) -> Result<SymbolFindCommandResult, PatchError> {
-    let scope = scope.canonicalize().unwrap_or_else(|_| scope.to_path_buf());
+    let scope = crate::engine::resolve_scope(scope);
     let result = crate::search::search_symbol_raw(query, &scope)?;
 
     let kind_filter = kind.map(SymbolMatchKind::from);
@@ -157,7 +157,7 @@ pub fn run_callers(
     scope: &Path,
     budget: Option<u64>,
 ) -> Result<SymbolCallersCommandResult, PatchError> {
-    let scope = scope.canonicalize().unwrap_or_else(|_| scope.to_path_buf());
+    let scope = crate::engine::resolve_scope(scope);
     let bloom = crate::index::bloom::BloomFilterCache::new();
     let result = crate::search::callers::search_callers_structured(query, &scope, &bloom, None)?;
 

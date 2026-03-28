@@ -36,7 +36,7 @@ pub fn run(
     budget: Option<u64>,
 ) -> Result<MapCommandResult, PatchError> {
     let cache = OutlineCache::new();
-    let scope = scope.canonicalize().unwrap_or_else(|_| scope.to_path_buf());
+    let scope = crate::engine::resolve_scope(scope);
     let full_map = crate::map::generate(&scope, depth, None, &cache);
     let full_tree_text = full_map.text;
     let tree_text = match budget {
