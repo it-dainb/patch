@@ -306,6 +306,8 @@ fn read_json_key_and_index_slice_selected_array() {
 
     assert_success(&output);
     assert_toon_success_baseline(&text);
+    assert_not_contains(&text, "[\n");
+    assert_contains(&text, "id:");
     assert_contains(&text, "Ada");
     assert_not_contains(&text, "Lin");
 }
@@ -338,6 +340,8 @@ fn read_json_root_array_index_slice_renders_toon() {
 
     assert_success(&output);
     assert_toon_success_baseline(&text);
+    assert_not_contains(&text, "[\n");
+    assert_contains(&text, "id,kind");
     assert_contains(&text, "b2");
     assert_contains(&text, "c3");
     assert_not_contains(&text, "a1");
@@ -354,7 +358,10 @@ fn read_rejects_key_with_lines_or_heading() {
         "1:2",
     ]);
     assert_failure(&lines_output);
-    assert_contains(&stderr(&lines_output), "--key cannot be used with --lines");
+    assert_contains(
+        &stderr(&lines_output),
+        "--key <KEY>' cannot be used with '--lines",
+    );
 
     let heading_output = run_patch([
         "read",
@@ -367,7 +374,7 @@ fn read_rejects_key_with_lines_or_heading() {
     assert_failure(&heading_output);
     assert_contains(
         &stderr(&heading_output),
-        "--key cannot be used with --heading",
+        "--key <KEY>' cannot be used with '--heading",
     );
 }
 
@@ -384,7 +391,7 @@ fn read_rejects_index_with_lines_or_heading() {
     assert_failure(&lines_output);
     assert_contains(
         &stderr(&lines_output),
-        "--index cannot be used with --lines",
+        "--index <START:END>' cannot be used with '--lines",
     );
 
     let heading_output = run_patch([
@@ -398,7 +405,7 @@ fn read_rejects_index_with_lines_or_heading() {
     assert_failure(&heading_output);
     assert_contains(
         &stderr(&heading_output),
-        "--index cannot be used with --heading",
+        "--index <START:END>' cannot be used with '--heading",
     );
 }
 
@@ -424,11 +431,24 @@ fn read_json_invalid_key_path_fails() {
         "read",
         "tests/fixtures/json/users.json",
         "--key",
-        "users.9.accounts",
+        "users.0.missing",
     ]);
 
     assert_failure(&output);
     assert_contains(&stderr(&output), "missing key segment");
+}
+
+#[test]
+fn read_json_invalid_index_syntax_fails() {
+    let output = run_patch([
+        "read",
+        "tests/fixtures/json/root-array.json",
+        "--index",
+        "1-3",
+    ]);
+
+    assert_failure(&output);
+    assert_contains(&stderr(&output), "expected index range in START:END format");
 }
 
 #[test]

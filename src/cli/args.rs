@@ -41,6 +41,16 @@ pub struct ReadArgs {
     #[arg(long)]
     pub full: bool,
 
+    #[arg(long, conflicts_with_all = ["lines", "heading"])]
+    pub key: Option<String>,
+
+    #[arg(
+        long,
+        value_name = "START:END",
+        conflicts_with_all = ["lines", "heading"]
+    )]
+    pub index: Option<String>,
+
     #[arg(long)]
     pub budget: Option<u64>,
 }
