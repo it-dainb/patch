@@ -1,4 +1,6 @@
 use std::ffi::OsStr;
+use std::path::Path;
+use std::path::PathBuf;
 use std::process::Output;
 
 use assert_cmd::Command;
@@ -13,6 +15,19 @@ where
 {
     Command::cargo_bin("patch")
         .expect("patch binary should build for integration tests")
+        .args(args)
+        .output()
+        .expect("patch should execute")
+}
+
+fn run_patch_from<I, S>(args: I, cwd: &Path) -> Output
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    Command::cargo_bin("patch")
+        .expect("patch binary should build for integration tests")
+        .current_dir(cwd)
         .args(args)
         .output()
         .expect("patch should execute")
@@ -62,6 +77,22 @@ where
     })
 }
 
+fn run_patch_json_from<I, S>(args: I, cwd: &Path) -> Value
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    let output = run_patch_from(args, cwd);
+    assert_success(&output);
+    serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
+        panic!(
+            "expected valid json stdout, got error: {error}\nstdout:\n{}\nstderr:\n{}",
+            stdout(&output),
+            stderr(&output)
+        )
+    })
+}
+
 fn run_patch_json_failure<I, S>(args: I) -> Value
 where
     I: IntoIterator<Item = S>,
@@ -76,6 +107,12 @@ where
             stderr(&output)
         )
     })
+}
+
+fn fixture_dir_from_repo(relative_path: &str) -> PathBuf {
+    std::env::current_dir()
+        .expect("integration test process should have a current dir")
+        .join(relative_path)
 }
 
 fn diagnostics(value: &Value) -> &[Value] {
@@ -294,5 +331,26 @@ fn search_regex_respects_patchignore() {
     assert!(
         match_paths(&value).is_empty(),
         "expected ignored regex matches to be excluded from traversal: {value:#}"
+    );
+}
+
+#[test]
+fn search_text_parent_relative_scope_uses_invoking_cwd() {
+    let fixture_nested_dir = fixture_dir_from_repo("tests/fixtures/patchignore/nested");
+    let value = run_patch_json_from(
+        [
+            "search",
+            "text",
+            "VISIBLE_API_TEXT_MARKER",
+            "--scope",
+            "..",
+            "--json",
+        ],
+        &fixture_nested_dir,
+    );
+
+    assert!(
+        match_paths(&value).contains(&"visible_api.rs"),
+        "expected visible_api.rs match when scope resolves from invoking cwd: {value:#}"
     );
 }

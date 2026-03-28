@@ -1,4 +1,6 @@
 use std::ffi::OsStr;
+use std::path::Path;
+use std::path::PathBuf;
 use std::process::Output;
 
 use assert_cmd::Command;
@@ -13,6 +15,19 @@ where
 {
     Command::cargo_bin("patch")
         .expect("patch binary should build for integration tests")
+        .args(args)
+        .output()
+        .expect("patch should execute")
+}
+
+fn run_patch_from<I, S>(args: I, cwd: &Path) -> Output
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    Command::cargo_bin("patch")
+        .expect("patch binary should build for integration tests")
+        .current_dir(cwd)
         .args(args)
         .output()
         .expect("patch should execute")
@@ -50,6 +65,28 @@ where
             stderr(&output)
         )
     })
+}
+
+fn run_patch_json_from<I, S>(args: I, cwd: &Path) -> Value
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    let output = run_patch_from(args, cwd);
+    assert_success(&output);
+    serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
+        panic!(
+            "expected valid json stdout, got error: {error}\nstdout:\n{}\nstderr:\n{}",
+            stdout(&output),
+            stderr(&output)
+        )
+    })
+}
+
+fn fixture_dir_from_repo(relative_path: &str) -> PathBuf {
+    std::env::current_dir()
+        .expect("integration test process should have a current dir")
+        .join(relative_path)
 }
 
 fn files(value: &Value) -> &[Value] {
@@ -242,5 +279,24 @@ fn files_respects_patchignore_patterns_but_not_gitignore() {
     assert!(
         !paths.contains(&"ignored-dir/ignored_api.rs"),
         "expected ignored directory file to be excluded: {value:#}"
+    );
+}
+
+#[test]
+fn files_scope_parent_relative_uses_invoking_cwd() {
+    let fixture_nested_dir = fixture_dir_from_repo("tests/fixtures/patchignore/nested");
+    let value = run_patch_json_from(
+        ["files", "*.rs", "--scope", "..", "--json"],
+        &fixture_nested_dir,
+    );
+    let paths = file_paths(&value);
+
+    assert!(
+        paths.contains(&"visible_api.rs"),
+        "expected visible_api.rs relative to resolved parent scope: {value:#}"
+    );
+    assert!(
+        paths.contains(&"nested/root-only.rs"),
+        "expected nested/root-only.rs relative to resolved parent scope: {value:#}"
     );
 }

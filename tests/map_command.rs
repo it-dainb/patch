@@ -1,4 +1,6 @@
 use std::ffi::OsStr;
+use std::path::Path;
+use std::path::PathBuf;
 use std::process::Output;
 
 use assert_cmd::Command;
@@ -13,6 +15,19 @@ where
 {
     Command::cargo_bin("patch")
         .expect("patch binary should build for integration tests")
+        .args(args)
+        .output()
+        .expect("patch should execute")
+}
+
+fn run_patch_from<I, S>(args: I, cwd: &Path) -> Output
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    Command::cargo_bin("patch")
+        .expect("patch binary should build for integration tests")
+        .current_dir(cwd)
         .args(args)
         .output()
         .expect("patch should execute")
@@ -50,6 +65,28 @@ where
             stderr(&output)
         )
     })
+}
+
+fn run_patch_json_from<I, S>(args: I, cwd: &Path) -> Value
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    let output = run_patch_from(args, cwd);
+    assert_success(&output);
+    serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
+        panic!(
+            "expected valid json stdout, got error: {error}\nstdout:\n{}\nstderr:\n{}",
+            stdout(&output),
+            stderr(&output)
+        )
+    })
+}
+
+fn fixture_dir_from_repo(relative_path: &str) -> PathBuf {
+    std::env::current_dir()
+        .expect("integration test process should have a current dir")
+        .join(relative_path)
 }
 
 #[test]
@@ -235,5 +272,40 @@ fn map_respects_patchignore_patterns() {
             && !entry_paths.contains(&"ignored_caller.rs")
             && !entry_paths.contains(&"ignored_dependent.rs"),
         "expected ignored directory files to be excluded from map entries: {value:#}"
+    );
+}
+
+#[test]
+fn map_scope_dot_uses_invoking_cwd() {
+    let fixture_dir = fixture_dir_from_repo("tests/fixtures/patchignore");
+    let value = run_patch_json_from(["map", "--scope", ".", "--json"], &fixture_dir);
+
+    let expected_scope = fixture_dir.to_string_lossy();
+    assert_eq!(
+        value["data"]["scope"].as_str(),
+        Some(expected_scope.as_ref()),
+        "expected data.scope to resolve from invoking cwd: {value:#}"
+    );
+    assert_eq!(
+        value["data"]["meta"]["scope"].as_str(),
+        Some(expected_scope.as_ref()),
+        "expected data.meta.scope to resolve from invoking cwd: {value:#}"
+    );
+
+    let entry_paths: Vec<&str> = value["data"]["entries"]
+        .as_array()
+        .unwrap_or_else(|| {
+            panic!(
+                "expected map entries array, got:\n{}",
+                serde_json::to_string_pretty(&value).expect("json value should serialize")
+            )
+        })
+        .iter()
+        .filter_map(|entry| entry["path"].as_str())
+        .collect();
+
+    assert!(
+        entry_paths.contains(&"visible_api.rs"),
+        "expected scope-relative visible_api.rs entry: {value:#}"
     );
 }

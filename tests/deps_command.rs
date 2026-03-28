@@ -1,4 +1,6 @@
 use std::ffi::OsStr;
+use std::path::Path;
+use std::path::PathBuf;
 use std::process::Output;
 
 use assert_cmd::Command;
@@ -13,6 +15,19 @@ where
 {
     Command::cargo_bin("patch")
         .expect("patch binary should build for integration tests")
+        .args(args)
+        .output()
+        .expect("patch should execute")
+}
+
+fn run_patch_from<I, S>(args: I, cwd: &Path) -> Output
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    Command::cargo_bin("patch")
+        .expect("patch binary should build for integration tests")
+        .current_dir(cwd)
         .args(args)
         .output()
         .expect("patch should execute")
@@ -62,6 +77,22 @@ where
     })
 }
 
+fn run_patch_json_from<I, S>(args: I, cwd: &Path) -> Value
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    let output = run_patch_from(args, cwd);
+    assert_success(&output);
+    serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
+        panic!(
+            "expected valid json stdout, got error: {error}\nstdout:\n{}\nstderr:\n{}",
+            stdout(&output),
+            stderr(&output)
+        )
+    })
+}
+
 fn run_patch_json_failure<I, S>(args: I) -> Value
 where
     I: IntoIterator<Item = S>,
@@ -76,6 +107,12 @@ where
             stderr(&output)
         )
     })
+}
+
+fn fixture_dir_from_repo(relative_path: &str) -> PathBuf {
+    std::env::current_dir()
+        .expect("integration test process should have a current dir")
+        .join(relative_path)
 }
 
 fn diagnostics(value: &Value) -> &[Value] {
@@ -354,5 +391,36 @@ fn deps_accepts_explicit_patchignored_target_but_omits_ignored_dependents() {
     assert!(
         !used_by_paths.contains(&"ignored-dir/ignored_dependent.rs"),
         "expected ignored dependent to be excluded from traversal-derived results: {value:#}"
+    );
+}
+
+#[test]
+fn deps_path_stays_cwd_relative_when_scope_is_dot() {
+    let fixture_dir = fixture_dir_from_repo("tests/fixtures/patchignore");
+    let value = run_patch_json_from(
+        ["deps", "visible_api.rs", "--scope", ".", "--json"],
+        &fixture_dir,
+    );
+
+    assert_eq!(
+        value["data"]["path"], "visible_api.rs",
+        "expected positional path to stay invoking-cwd relative: {value:#}"
+    );
+
+    let used_by_paths: Vec<&str> = used_by(&value)
+        .iter()
+        .map(|entry| {
+            entry["path"].as_str().unwrap_or_else(|| {
+                panic!(
+                    "expected dependent path string, got:\n{}",
+                    serde_json::to_string_pretty(entry).expect("json value should serialize")
+                )
+            })
+        })
+        .collect();
+
+    assert!(
+        used_by_paths.contains(&"visible_caller.rs"),
+        "expected visible_caller.rs dependent in scope-relative output: {value:#}"
     );
 }

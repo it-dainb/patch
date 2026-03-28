@@ -1,4 +1,6 @@
 use std::ffi::OsStr;
+use std::path::Path;
+use std::path::PathBuf;
 use std::process::Output;
 
 use assert_cmd::Command;
@@ -13,6 +15,19 @@ where
 {
     Command::cargo_bin("patch")
         .expect("patch binary should build for integration tests")
+        .args(args)
+        .output()
+        .expect("patch should execute")
+}
+
+fn run_patch_from<I, S>(args: I, cwd: &Path) -> Output
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    Command::cargo_bin("patch")
+        .expect("patch binary should build for integration tests")
+        .current_dir(cwd)
         .args(args)
         .output()
         .expect("patch should execute")
@@ -50,6 +65,28 @@ where
             stderr(&output)
         )
     })
+}
+
+fn run_patch_json_from<I, S>(args: I, cwd: &Path) -> Value
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    let output = run_patch_from(args, cwd);
+    assert_success(&output);
+    serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
+        panic!(
+            "expected valid json stdout, got error: {error}\nstdout:\n{}\nstderr:\n{}",
+            stdout(&output),
+            stderr(&output)
+        )
+    })
+}
+
+fn fixture_dir_from_repo(relative_path: &str) -> PathBuf {
+    std::env::current_dir()
+        .expect("integration test process should have a current dir")
+        .join(relative_path)
 }
 
 fn callers(value: &Value) -> &[Value] {
@@ -247,5 +284,31 @@ fn symbol_callers_excludes_patchignored_call_sites() {
     assert!(
         !caller_paths.contains(&"ignored-dir/ignored_caller.rs"),
         "expected ignored caller to be excluded from traversal: {value:#}"
+    );
+}
+
+#[test]
+fn symbol_callers_scope_dot_uses_invoking_cwd() {
+    let fixture_dir = fixture_dir_from_repo("tests/fixtures/patchignore");
+    let value = run_patch_json_from(
+        ["symbol", "callers", "visible_api", "--scope", ".", "--json"],
+        &fixture_dir,
+    );
+
+    let caller_paths: Vec<&str> = callers(&value)
+        .iter()
+        .map(|caller| {
+            caller["path"].as_str().unwrap_or_else(|| {
+                panic!(
+                    "expected caller path string, got:\n{}",
+                    serde_json::to_string_pretty(caller).expect("json value should serialize")
+                )
+            })
+        })
+        .collect();
+
+    assert!(
+        caller_paths.contains(&"visible_caller.rs"),
+        "expected direct caller to remain scope-relative: {value:#}"
     );
 }
