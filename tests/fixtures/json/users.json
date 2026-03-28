@@ -1,0 +1,35 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "name": "Ada",
+      "accounts": [
+        {
+          "id": "chk-1",
+          "type": "checking",
+          "balance": 1200
+        },
+        {
+          "id": "sav-1",
+          "type": "savings",
+          "balance": 4500
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "Lin",
+      "accounts": [
+        {
+          "id": "chk-2",
+          "type": "checking",
+          "balance": 800
+        }
+      ]
+    }
+  ],
+  "meta": {
+    "generated_at": "2026-01-01T00:00:00Z",
+    "source": "integration-test"
+  }
+}

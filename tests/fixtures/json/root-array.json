@@ -1,0 +1,14 @@
+[
+  {
+    "id": "a1",
+    "kind": "alpha"
+  },
+  {
+    "id": "b2",
+    "kind": "beta"
+  },
+  {
+    "id": "c3",
+    "kind": "gamma"
+  }
+]
