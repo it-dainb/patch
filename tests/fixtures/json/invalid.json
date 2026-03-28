@@ -1,0 +1,8 @@
+{
+  "users": [
+    { "id": 1, "name": "Ada" },
+    { "id": 2, "name": "Lin" }
+  ],
+  "meta": {
+    "generated_at": "2026-01-01T00:00:00Z"
+  }

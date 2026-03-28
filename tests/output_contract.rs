@@ -417,3 +417,86 @@ fn invalid_query_text_output_uses_v2_error_sections() {
         "expected Diagnostics section to include an error entry: {text}"
     );
 }
+
+#[test]
+fn read_json_selector_contract_uses_key_index_variants() {
+    let key = run_patch_json([
+        "read",
+        "tests/fixtures/json/users.json",
+        "--key",
+        "users.0.accounts",
+        "--json",
+    ]);
+    assert_v2_envelope(&key, "read");
+    assert_eq!(
+        key["data"]["meta"]["selector_kind"], "key",
+        "expected key selector_kind in read meta: {key:#}"
+    );
+    assert_eq!(
+        key["data"]["meta"]["selector_display"], "users.0.accounts",
+        "expected key selector_display in read meta: {key:#}"
+    );
+    assert_eq!(
+        key["data"]["meta"]["file_kind"], "structured_data",
+        "expected JSON reads to keep file_kind=structured_data: {key:#}"
+    );
+    assert_eq!(
+        key["data"]["selector"],
+        serde_json::json!({"Key": {"value": "users.0.accounts"}}),
+        "expected key selector enum shape in read.data.selector: {key:#}"
+    );
+
+    let index = run_patch_json([
+        "read",
+        "tests/fixtures/json/root-array.json",
+        "--index",
+        "1:3",
+        "--json",
+    ]);
+    assert_v2_envelope(&index, "read");
+    assert_eq!(
+        index["data"]["meta"]["selector_kind"], "index",
+        "expected index selector_kind in read meta: {index:#}"
+    );
+    assert_eq!(
+        index["data"]["meta"]["selector_display"], "1:3",
+        "expected index selector_display in read meta: {index:#}"
+    );
+    assert_eq!(
+        index["data"]["meta"]["file_kind"], "structured_data",
+        "expected JSON reads to keep file_kind=structured_data: {index:#}"
+    );
+    assert_eq!(
+        index["data"]["selector"],
+        serde_json::json!({"Index": {"start": 1, "end": 3}}),
+        "expected index selector enum shape in read.data.selector: {index:#}"
+    );
+
+    let key_index = run_patch_json([
+        "read",
+        "tests/fixtures/json/users.json",
+        "--key",
+        "users",
+        "--index",
+        "0:1",
+        "--json",
+    ]);
+    assert_v2_envelope(&key_index, "read");
+    assert_eq!(
+        key_index["data"]["meta"]["selector_kind"], "key_index",
+        "expected key_index selector_kind in read meta: {key_index:#}"
+    );
+    assert_eq!(
+        key_index["data"]["meta"]["selector_display"], "users @ 0:1",
+        "expected key_index selector_display in read meta: {key_index:#}"
+    );
+    assert_eq!(
+        key_index["data"]["meta"]["file_kind"], "structured_data",
+        "expected JSON reads to keep file_kind=structured_data: {key_index:#}"
+    );
+    assert_eq!(
+        key_index["data"]["selector"],
+        serde_json::json!({"KeyIndex": {"value": "users", "start": 0, "end": 1}}),
+        "expected key_index selector enum shape in read.data.selector: {key_index:#}"
+    );
+}

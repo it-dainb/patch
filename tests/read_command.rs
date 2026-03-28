@@ -51,6 +51,26 @@ fn assert_contains(haystack: &str, needle: &str) {
     );
 }
 
+fn assert_not_contains(haystack: &str, needle: &str) {
+    assert!(
+        !haystack.contains(needle),
+        "expected to not find {needle:?} in:\n{haystack}"
+    );
+}
+
+fn evidence_block(text: &str) -> &str {
+    text.split("## Evidence\n")
+        .nth(1)
+        .and_then(|rest| rest.split("\n\n## Next\n").next())
+        .unwrap_or_else(|| panic!("expected output with Evidence and Next sections:\n{text}"))
+}
+
+fn assert_toon_success_baseline(text: &str) {
+    assert_contains(text, "# read");
+    let evidence = evidence_block(text);
+    assert_not_contains(evidence, "{\n");
+}
+
 fn run_patch_json<I, S>(args: I) -> Value
 where
     I: IntoIterator<Item = S>,
@@ -236,4 +256,200 @@ fn read_explicit_patchignored_path_still_succeeds() {
     assert_success(&output);
     assert_contains(&text, "pub fn ignored_api() -> &'static str");
     assert_contains(&text, "IGNORED_TEXT_MARKER");
+}
+
+#[test]
+fn read_json_renders_toon_for_full_file() {
+    let output = run_patch(["read", "tests/fixtures/json/users.json"]);
+    let text = stdout(&output);
+
+    assert_success(&output);
+    assert_toon_success_baseline(&text);
+    assert_contains(&text, "users[");
+    assert_contains(&text, "meta:");
+}
+
+#[test]
+fn read_json_full_flag_still_renders_toon() {
+    let output = run_patch(["read", "tests/fixtures/json/users.json", "--full"]);
+    let text = stdout(&output);
+
+    assert_success(&output);
+    assert_toon_success_baseline(&text);
+    assert_contains(&text, "users[");
+    assert_contains(&text, "meta:");
+}
+
+#[test]
+fn read_json_key_renders_selected_subtree() {
+    let output = run_patch(["read", "tests/fixtures/json/users.json", "--key", "meta"]);
+    let text = stdout(&output);
+
+    assert_success(&output);
+    assert_toon_success_baseline(&text);
+    assert_contains(&text, "generated_at:");
+    assert_contains(&text, "integration-test");
+    assert_not_contains(&text, "Ada");
+}
+
+#[test]
+fn read_json_key_and_index_slice_selected_array() {
+    let output = run_patch([
+        "read",
+        "tests/fixtures/json/users.json",
+        "--key",
+        "users",
+        "--index",
+        "0:1",
+    ]);
+    let text = stdout(&output);
+
+    assert_success(&output);
+    assert_toon_success_baseline(&text);
+    assert_contains(&text, "Ada");
+    assert_not_contains(&text, "Lin");
+}
+
+#[test]
+fn read_json_nested_numeric_key_path_resolves() {
+    let output = run_patch([
+        "read",
+        "tests/fixtures/json/users.json",
+        "--key",
+        "users.0.accounts.1",
+    ]);
+    let text = stdout(&output);
+
+    assert_success(&output);
+    assert_toon_success_baseline(&text);
+    assert_contains(&text, "sav-1");
+    assert_not_contains(&text, "chk-2");
+}
+
+#[test]
+fn read_json_root_array_index_slice_renders_toon() {
+    let output = run_patch([
+        "read",
+        "tests/fixtures/json/root-array.json",
+        "--index",
+        "1:3",
+    ]);
+    let text = stdout(&output);
+
+    assert_success(&output);
+    assert_toon_success_baseline(&text);
+    assert_contains(&text, "b2");
+    assert_contains(&text, "c3");
+    assert_not_contains(&text, "a1");
+}
+
+#[test]
+fn read_rejects_key_with_lines_or_heading() {
+    let lines_output = run_patch([
+        "read",
+        "tests/fixtures/json/users.json",
+        "--key",
+        "users",
+        "--lines",
+        "1:2",
+    ]);
+    assert_failure(&lines_output);
+    assert_contains(&stderr(&lines_output), "--key cannot be used with --lines");
+
+    let heading_output = run_patch([
+        "read",
+        "tests/fixtures/json/users.json",
+        "--key",
+        "users",
+        "--heading",
+        "## anything",
+    ]);
+    assert_failure(&heading_output);
+    assert_contains(
+        &stderr(&heading_output),
+        "--key cannot be used with --heading",
+    );
+}
+
+#[test]
+fn read_rejects_index_with_lines_or_heading() {
+    let lines_output = run_patch([
+        "read",
+        "tests/fixtures/json/users.json",
+        "--index",
+        "0:1",
+        "--lines",
+        "1:2",
+    ]);
+    assert_failure(&lines_output);
+    assert_contains(
+        &stderr(&lines_output),
+        "--index cannot be used with --lines",
+    );
+
+    let heading_output = run_patch([
+        "read",
+        "tests/fixtures/json/users.json",
+        "--index",
+        "0:1",
+        "--heading",
+        "## anything",
+    ]);
+    assert_failure(&heading_output);
+    assert_contains(
+        &stderr(&heading_output),
+        "--index cannot be used with --heading",
+    );
+}
+
+#[test]
+fn read_rejects_key_for_non_json_files() {
+    let output = run_patch(["read", "README.md", "--key", "users"]);
+
+    assert_failure(&output);
+    assert_contains(&stderr(&output), "--key is only supported for JSON files");
+}
+
+#[test]
+fn read_rejects_index_for_non_json_files() {
+    let output = run_patch(["read", "README.md", "--index", "0:1"]);
+
+    assert_failure(&output);
+    assert_contains(&stderr(&output), "--index is only supported for JSON files");
+}
+
+#[test]
+fn read_json_invalid_key_path_fails() {
+    let output = run_patch([
+        "read",
+        "tests/fixtures/json/users.json",
+        "--key",
+        "users.9.accounts",
+    ]);
+
+    assert_failure(&output);
+    assert_contains(&stderr(&output), "missing key segment");
+}
+
+#[test]
+fn read_json_out_of_range_index_fails() {
+    let output = run_patch([
+        "read",
+        "tests/fixtures/json/users.json",
+        "--key",
+        "users",
+        "--index",
+        "10:12",
+    ]);
+
+    assert_failure(&output);
+    assert_contains(&stderr(&output), "index range starts at");
+}
+
+#[test]
+fn read_json_invalid_parse_fails() {
+    let output = run_patch(["read", "tests/fixtures/json/invalid.json"]);
+
+    assert_failure(&output);
+    assert_contains(&stderr(&output), "invalid JSON");
 }
