@@ -138,6 +138,20 @@ fn readme_and_cli_contract_document_v2_output_contract() {
     }
 
     assert_contains(&readme, "cargo run -- read README.md --lines 7:17");
+    assert_contains(&readme, "JSON files always render as TOON text");
+    assert_contains(
+        &readme,
+        "cargo run -- read tests/fixtures/json/users.json --key users.0.accounts",
+    );
+    assert_contains(
+        &readme,
+        "cargo run -- read tests/fixtures/json/root-array.json --index 0:1",
+    );
+    assert_contains(
+        &readme,
+        "cargo run -- read tests/fixtures/json/users.json --key users.0.accounts --index 0:1",
+    );
+    assert_contains(&readme, "`--key` and `--index` are JSON-only selectors");
     assert_contains(
         &readme,
         "cargo run -- files \"*.definitely-nope\" --scope src --json",
@@ -156,6 +170,29 @@ fn readme_and_cli_contract_document_v2_output_contract() {
         "cargo run -- files \"*.rs\" --scope tests/fixtures/patchignore",
     );
     assert_contains(&contract, "heading_aligned");
+    assert_contains(&contract, "`read` supports these selectors");
+    assert_contains(
+        &contract,
+        "`selector_kind`: `full`, `lines`, `heading`, `key`, `index`, `key_index`",
+    );
+    assert_contains(&contract, "`selector_display` uses raw selector text");
+    assert_contains(&contract, "`{\"Key\": {\"value\": \"users.0.accounts\"}}`");
+    assert_contains(&contract, "`{\"Index\": {\"start\": 0, \"end\": 1}}`");
+    assert_contains(
+        &contract,
+        "`{\"KeyIndex\": {\"value\": \"users.0.accounts\", \"start\": 0, \"end\": 1}}`",
+    );
+    assert_contains(&contract, "JSON `read` content is TOON text");
+    assert_contains(&contract, "`invalid JSON`");
+    assert_contains(&contract, "`missing key segment`");
+    assert_contains(&contract, "`expected numeric array index`");
+    assert_contains(&contract, "`expected index range in START:END format`");
+    assert_contains(
+        &contract,
+        "`index range end must be greater than or equal to start`",
+    );
+    assert_contains(&contract, "`index range starts at`");
+    assert_contains(&contract, "`failed to encode JSON as TOON`");
     assert_contains(&contract, "first selected line itself");
     assert_contains(&contract, ".patchignore");
     assert_contains(&contract, "only one .patchignore at the scope root is read");
@@ -216,6 +253,47 @@ fn read_command_examples_from_readme_stay_valid() {
     let heading = run_patch(["read", "README.md", "--heading", "## Command families"]);
     assert_success(&heading);
     assert_contains(&stdout(&heading), "## Command families");
+
+    let json_key = run_patch([
+        "read",
+        "tests/fixtures/json/users.json",
+        "--key",
+        "users.0.accounts",
+    ]);
+    let json_key_text = stdout(&json_key);
+    assert_success(&json_key);
+    assert_contains(&json_key_text, "selector_kind: key");
+    assert_contains(&json_key_text, "selector_display: users.0.accounts");
+    assert_contains(&json_key_text, "[2]{id,type,balance}:");
+
+    let json_index = run_patch([
+        "read",
+        "tests/fixtures/json/root-array.json",
+        "--index",
+        "0:1",
+    ]);
+    let json_index_text = stdout(&json_index);
+    assert_success(&json_index);
+    assert_contains(&json_index_text, "selector_kind: index");
+    assert_contains(&json_index_text, "selector_display: 0:1");
+    assert_contains(&json_index_text, "[1]{id,kind}:");
+
+    let json_key_index = run_patch([
+        "read",
+        "tests/fixtures/json/users.json",
+        "--key",
+        "users.0.accounts",
+        "--index",
+        "0:1",
+    ]);
+    let json_key_index_text = stdout(&json_key_index);
+    assert_success(&json_key_index);
+    assert_contains(&json_key_index_text, "selector_kind: key_index");
+    assert_contains(
+        &json_key_index_text,
+        "selector_display: users.0.accounts @ 0:1",
+    );
+    assert_contains(&json_key_index_text, "[1]{id,type,balance}:");
 }
 
 #[test]

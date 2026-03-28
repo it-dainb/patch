@@ -74,14 +74,17 @@ cargo run -- map --scope src
 
 ### `read`
 
-Read a file in full, by line range, or by markdown heading.
+Read a file in full, by line range, by markdown heading, or by JSON selectors.
 
 ```bash
 cargo run -- read README.md --lines 7:17
 cargo run -- read README.md --heading "## Command families"
+cargo run -- read tests/fixtures/json/users.json --key users.0.accounts
+cargo run -- read tests/fixtures/json/root-array.json --index 0:1
+cargo run -- read tests/fixtures/json/users.json --key users.0.accounts --index 0:1
 ```
 
-Use `read` when you already know the path and need exact content. Markdown `--lines` remains valid for arbitrary chunk reads; when the first selected line is itself a recognized heading, patch may also suggest a `--heading` follow-up to read the full section.
+Use `read` when you already know the path and need exact content. Markdown `--lines` remains valid for arbitrary chunk reads; when the first selected line is itself a recognized heading, patch may also suggest a `--heading` follow-up to read the full section. JSON files always render as TOON text, including `--full` and selector reads. `--key` and `--index` are JSON-only selectors: `--key <PATH>` drills into a subtree using dot-separated object keys and numeric array segments, and `--index START:END` slices arrays with zero-based, end-exclusive bounds.
 
 ### `symbol find`
 
