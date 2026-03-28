@@ -29,7 +29,7 @@ pub fn run(
     scope: &Path,
     budget: Option<u64>,
 ) -> Result<FilesCommandResult, PatchError> {
-    let scope = scope.canonicalize().unwrap_or_else(|_| scope.to_path_buf());
+    let scope = crate::engine::resolve_scope(scope);
     let result = crate::search::glob::search(pattern, &scope)?;
 
     let mut command_result = FilesCommandResult {

@@ -55,7 +55,7 @@ fn run(
     mode: SearchMode,
     budget: Option<u64>,
 ) -> Result<SearchCommandResult, PatchError> {
-    let scope = scope.canonicalize().unwrap_or_else(|_| scope.to_path_buf());
+    let scope = crate::engine::resolve_scope(scope);
     let result = match mode {
         SearchMode::Text => crate::search::search_content_raw(query, &scope)?,
         SearchMode::Regex => crate::search::search_regex_raw(query, &scope)?,

@@ -50,7 +50,7 @@ pub fn run(path: &Path, scope: &Path) -> Result<DepsCommandResult, PatchError> {
         });
     }
 
-    let scope = scope.canonicalize().unwrap_or_else(|_| scope.to_path_buf());
+    let scope = crate::engine::resolve_scope(scope);
     let cache = crate::cache::OutlineCache::new();
     let bloom = crate::index::bloom::BloomFilterCache::new();
     let result = crate::search::deps::analyze_deps(path, &scope, &cache, &bloom)?;
