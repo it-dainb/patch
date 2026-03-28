@@ -68,6 +68,7 @@ fn evidence_block(text: &str) -> &str {
 fn assert_toon_success_baseline(text: &str) {
     assert_contains(text, "# read");
     let evidence = evidence_block(text);
+    assert_contains(evidence, "[toon]");
     assert_not_contains(evidence, "{\n");
 }
 

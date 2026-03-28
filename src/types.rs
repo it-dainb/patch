@@ -42,6 +42,7 @@ pub enum ViewMode {
     Full,
     Outline,
     Keys,
+    Toon,
     #[allow(dead_code)]
     HeadTail,
     Empty,
@@ -59,6 +60,7 @@ impl std::fmt::Display for ViewMode {
             Self::Full => write!(f, "full"),
             Self::Outline => write!(f, "outline"),
             Self::Keys => write!(f, "keys"),
+            Self::Toon => write!(f, "toon"),
             Self::HeadTail => write!(f, "head+tail"),
             Self::Empty => write!(f, "empty"),
             Self::Generated => write!(f, "generated — skipped"),
