@@ -1,6 +1,7 @@
 pub mod binary;
 pub mod generated;
 pub mod imports;
+pub mod json;
 pub mod outline;
 
 use std::fs;
