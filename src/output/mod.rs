@@ -3,7 +3,7 @@ pub mod text;
 
 use serde_json::{Map, Value};
 
-use crate::error::PatchError;
+use crate::error::DrailError;
 use crate::output::json::envelope::{
     Diagnostic, DiagnosticLevel, Envelope, EnvelopeData, NextItem,
 };
@@ -49,7 +49,7 @@ impl CommandOutput {
     }
 
     #[must_use]
-    pub fn from_error(command: &'static str, error: &PatchError) -> Self {
+    pub fn from_error(command: &'static str, error: &DrailError) -> Self {
         let diagnostic = diagnostic_from_error(error);
         Self {
             command,
@@ -79,42 +79,42 @@ pub fn write_error(output: &CommandOutput, json_mode: bool, is_tty: bool) {
     }
 }
 
-fn diagnostic_from_error(error: &PatchError) -> Diagnostic {
+fn diagnostic_from_error(error: &DrailError) -> Diagnostic {
     match error {
-        PatchError::AlreadyReported { .. } => {
+        DrailError::AlreadyReported { .. } => {
             unreachable!("AlreadyReported is an internal control-flow signal")
         }
-        PatchError::NotFound { suggestion, .. } => Diagnostic {
+        DrailError::NotFound { suggestion, .. } => Diagnostic {
             level: DiagnosticLevel::Error,
             code: "not_found".into(),
             message: error.to_string(),
             suggestion: suggestion.clone(),
         },
-        PatchError::PermissionDenied { .. } => Diagnostic {
+        DrailError::PermissionDenied { .. } => Diagnostic {
             level: DiagnosticLevel::Error,
             code: "permission_denied".into(),
             message: error.to_string(),
             suggestion: None,
         },
-        PatchError::InvalidQuery { .. } => Diagnostic {
+        DrailError::InvalidQuery { .. } => Diagnostic {
             level: DiagnosticLevel::Error,
             code: "invalid_query".into(),
             message: error.to_string(),
             suggestion: None,
         },
-        PatchError::IoError { .. } => Diagnostic {
+        DrailError::IoError { .. } => Diagnostic {
             level: DiagnosticLevel::Error,
             code: "io_error".into(),
             message: error.to_string(),
             suggestion: None,
         },
-        PatchError::ParseError { .. } => Diagnostic {
+        DrailError::ParseError { .. } => Diagnostic {
             level: DiagnosticLevel::Error,
             code: "parse_error".into(),
             message: error.to_string(),
             suggestion: None,
         },
-        PatchError::Clap { .. } => Diagnostic {
+        DrailError::Clap { .. } => Diagnostic {
             level: DiagnosticLevel::Error,
             code: "clap".into(),
             message: error.to_string(),

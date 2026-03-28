@@ -6,31 +6,31 @@ use std::process::Output;
 use assert_cmd::Command;
 use serde_json::Value;
 
-const PATCHIGNORE_SCOPE: &str = "tests/fixtures/patchignore";
+const DRAILIGNORE_SCOPE: &str = "tests/fixtures/drailignore";
 
-fn run_patch<I, S>(args: I) -> Output
+fn run_drail<I, S>(args: I) -> Output
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    Command::cargo_bin("patch")
-        .expect("patch binary should build for integration tests")
+    Command::cargo_bin("drail")
+        .expect("drail binary should build for integration tests")
         .args(args)
         .output()
-        .expect("patch should execute")
+        .expect("drail should execute")
 }
 
-fn run_patch_from<I, S>(args: I, cwd: &Path) -> Output
+fn run_drail_from<I, S>(args: I, cwd: &Path) -> Output
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    Command::cargo_bin("patch")
-        .expect("patch binary should build for integration tests")
+    Command::cargo_bin("drail")
+        .expect("drail binary should build for integration tests")
         .current_dir(cwd)
         .args(args)
         .output()
-        .expect("patch should execute")
+        .expect("drail should execute")
 }
 
 fn stdout(output: &Output) -> String {
@@ -51,12 +51,12 @@ fn assert_success(output: &Output) {
     );
 }
 
-fn run_patch_json<I, S>(args: I) -> Value
+fn run_drail_json<I, S>(args: I) -> Value
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    let output = run_patch(args);
+    let output = run_drail(args);
     assert_success(&output);
     serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
         panic!(
@@ -67,12 +67,12 @@ where
     })
 }
 
-fn run_patch_json_from<I, S>(args: I, cwd: &Path) -> Value
+fn run_drail_json_from<I, S>(args: I, cwd: &Path) -> Value
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    let output = run_patch_from(args, cwd);
+    let output = run_drail_from(args, cwd);
     assert_success(&output);
     serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
         panic!(
@@ -114,7 +114,7 @@ fn file_paths(value: &Value) -> Vec<&str> {
 
 #[test]
 fn files_returns_typed_matches() {
-    let value = run_patch_json(["files", "*.rs", "--scope", "src/output", "--json"]);
+    let value = run_drail_json(["files", "*.rs", "--scope", "src/output", "--json"]);
 
     assert_eq!(value["command"], "files");
     assert_eq!(value["schema_version"], 2);
@@ -150,7 +150,7 @@ fn files_returns_typed_matches() {
 
 #[test]
 fn files_no_match_reports_single_recovery_hint() {
-    let value = run_patch_json([
+    let value = run_drail_json([
         "files",
         "*.definitelymissingxyz",
         "--scope",
@@ -185,7 +185,7 @@ fn files_no_match_reports_single_recovery_hint() {
 
 #[test]
 fn files_multiple_matches_use_stable_ordering() {
-    let value = run_patch_json(["files", "*.rs", "--scope", "src/output", "--json"]);
+    let value = run_drail_json(["files", "*.rs", "--scope", "src/output", "--json"]);
     let files = files(&value);
 
     let paths: Vec<&str> = files
@@ -210,22 +210,22 @@ fn files_multiple_matches_use_stable_ordering() {
 
 #[test]
 fn files_text_no_match_includes_single_next_step_hint() {
-    let output = run_patch(["files", "*.definitelymissingxyz", "--scope", "src"]);
+    let output = run_drail(["files", "*.definitelymissingxyz", "--scope", "src"]);
     let text = stdout(&output);
 
     assert_success(&output);
     assert!(text.contains("## Next"), "expected next block: {text}");
     assert!(
-        text.contains("patch files")
-            || text.contains("patch search")
-            || text.contains("patch symbol"),
+        text.contains("drail files")
+            || text.contains("drail search")
+            || text.contains("drail symbol"),
         "expected a next-step suggestion in text output: {text}"
     );
 }
 
 #[test]
 fn files_no_match_guidance_renders_in_next_section() {
-    let output = run_patch(["files", "*.definitelymissingxyz", "--scope", "src"]);
+    let output = run_drail(["files", "*.definitelymissingxyz", "--scope", "src"]);
     let text = stdout(&output);
 
     assert_success(&output);
@@ -246,14 +246,14 @@ fn files_no_match_guidance_renders_in_next_section() {
         "expected Evidence to stay evidentiary only: {text}"
     );
     assert!(
-        next.contains("patch files"),
+        next.contains("drail files"),
         "expected recovery guidance in Next section: {text}"
     );
 }
 
 #[test]
-fn files_respects_patchignore_patterns_but_not_gitignore() {
-    let value = run_patch_json(["files", "*.rs", "--scope", PATCHIGNORE_SCOPE, "--json"]);
+fn files_respects_drailignore_patterns_but_not_gitignore() {
+    let value = run_drail_json(["files", "*.rs", "--scope", DRAILIGNORE_SCOPE, "--json"]);
     let paths = file_paths(&value);
 
     assert!(
@@ -262,7 +262,7 @@ fn files_respects_patchignore_patterns_but_not_gitignore() {
     );
     assert!(
         paths.contains(&"ignored-dir/reincluded.rs"),
-        "expected negated .patchignore path to be re-included: {value:#}"
+        "expected negated .drailignore path to be re-included: {value:#}"
     );
     assert!(
         paths.contains(&"nested/root-only.rs"),
@@ -284,8 +284,8 @@ fn files_respects_patchignore_patterns_but_not_gitignore() {
 
 #[test]
 fn files_scope_parent_relative_uses_invoking_cwd() {
-    let fixture_nested_dir = fixture_dir_from_repo("tests/fixtures/patchignore/nested");
-    let value = run_patch_json_from(
+    let fixture_nested_dir = fixture_dir_from_repo("tests/fixtures/drailignore/nested");
+    let value = run_drail_json_from(
         ["files", "*.rs", "--scope", "..", "--json"],
         &fixture_nested_dir,
     );

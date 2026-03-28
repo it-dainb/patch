@@ -1,16 +1,16 @@
 [package]
-name = "pm-patch"
-version = "0.0.3"
+name = "drail"
+version = "0.0.4"
 edition = "2021"
 description = "CLI-first code intelligence for AI agents"
 license = "MIT"
-repository = "https://github.com/it-dainb/patch"
+repository = "https://github.com/it-dainb/drail"
 readme = "README.md"
 keywords = ["code-search", "tree-sitter", "ai-agents", "cli"]
 categories = ["command-line-utilities", "development-tools"]
 
 [[bin]]
-name = "patch"
+name = "drail"
 path = "src/main.rs"
 
 [dependencies]

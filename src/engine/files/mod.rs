@@ -2,7 +2,7 @@ use std::path::Path;
 
 use serde::Serialize;
 
-use crate::error::PatchError;
+use crate::error::DrailError;
 use crate::output::json::envelope::{Diagnostic, DiagnosticLevel};
 
 #[derive(Debug, Clone, Serialize)]
@@ -28,7 +28,7 @@ pub fn run(
     pattern: &str,
     scope: &Path,
     budget: Option<u64>,
-) -> Result<FilesCommandResult, PatchError> {
+) -> Result<FilesCommandResult, DrailError> {
     let scope = crate::engine::resolve_scope(scope);
     let result = crate::search::glob::search(pattern, &scope)?;
 
@@ -83,7 +83,7 @@ fn diagnostics(
             None
         } else {
             Some(format!(
-                "Try: patch files \"*.{}\" --scope {}",
+                "Try: drail files \"*.{}\" --scope {}",
                 available_extensions[0],
                 scope.display()
             ))

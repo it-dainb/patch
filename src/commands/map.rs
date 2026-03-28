@@ -1,11 +1,11 @@
 use crate::cli::args::MapArgs;
 use crate::engine::map;
-use crate::error::PatchError;
+use crate::error::DrailError;
 use crate::output::CommandOutput;
 use crate::output::{json, text};
 use serde_json::{json, Map, Value};
 
-pub fn run(args: &MapArgs) -> Result<CommandOutput, PatchError> {
+pub fn run(args: &MapArgs) -> Result<CommandOutput, DrailError> {
     let result = map::run(&args.scope, args.depth, args.budget)?;
     let meta = meta_for_map(&result);
     let mut output = CommandOutput::with_parts(

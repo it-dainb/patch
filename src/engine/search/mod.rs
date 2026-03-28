@@ -2,7 +2,7 @@ use std::path::Path;
 
 use serde::Serialize;
 
-use crate::error::PatchError;
+use crate::error::DrailError;
 use crate::output::json::envelope::{Diagnostic, DiagnosticLevel};
 
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
@@ -37,7 +37,7 @@ pub fn run_text(
     query: &str,
     scope: &Path,
     budget: Option<u64>,
-) -> Result<SearchCommandResult, PatchError> {
+) -> Result<SearchCommandResult, DrailError> {
     run(query, scope, SearchMode::Text, budget)
 }
 
@@ -45,7 +45,7 @@ pub fn run_regex(
     pattern: &str,
     scope: &Path,
     budget: Option<u64>,
-) -> Result<SearchCommandResult, PatchError> {
+) -> Result<SearchCommandResult, DrailError> {
     run(pattern, scope, SearchMode::Regex, budget)
 }
 
@@ -54,7 +54,7 @@ fn run(
     scope: &Path,
     mode: SearchMode,
     budget: Option<u64>,
-) -> Result<SearchCommandResult, PatchError> {
+) -> Result<SearchCommandResult, DrailError> {
     let scope = crate::engine::resolve_scope(scope);
     let result = match mode {
         SearchMode::Text => crate::search::search_content_raw(query, &scope)?,
@@ -102,7 +102,7 @@ fn diagnostics(query: &str, scope: &Path, mode: SearchMode, total_found: usize) 
     if total_found == 0 {
         let suggestion = match mode {
             SearchMode::Text if looks_like_slash_delimited_regex(query) => Some(format!(
-                "Try: patch search regex {:?} --scope {}",
+                "Try: drail search regex {:?} --scope {}",
                 &query[1..query.len() - 1],
                 scope.display()
             )),

@@ -1,11 +1,11 @@
 use crate::cli::args::DepsArgs;
 use crate::engine::deps;
-use crate::error::PatchError;
+use crate::error::DrailError;
 use crate::output::CommandOutput;
 use crate::output::{json, text};
 use serde_json::{json, Map, Value};
 
-pub fn run(args: &DepsArgs) -> Result<CommandOutput, PatchError> {
+pub fn run(args: &DepsArgs) -> Result<CommandOutput, DrailError> {
     let result = deps::run(&args.path, &args.scope)?;
     let mut output = CommandOutput::with_parts(
         "deps",

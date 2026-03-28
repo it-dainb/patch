@@ -3,7 +3,7 @@ use std::path::Path;
 use serde::Serialize;
 
 use crate::cli::args::SymbolFindKind;
-use crate::error::PatchError;
+use crate::error::DrailError;
 use crate::output::json::envelope::{Diagnostic, DiagnosticLevel};
 
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
@@ -79,7 +79,7 @@ pub fn run(
     scope: &Path,
     kind: Option<SymbolFindKind>,
     budget: Option<u64>,
-) -> Result<SymbolFindCommandResult, PatchError> {
+) -> Result<SymbolFindCommandResult, DrailError> {
     let scope = crate::engine::resolve_scope(scope);
     let result = crate::search::search_symbol_raw(query, &scope)?;
 
@@ -156,7 +156,7 @@ pub fn run_callers(
     query: &str,
     scope: &Path,
     budget: Option<u64>,
-) -> Result<SymbolCallersCommandResult, PatchError> {
+) -> Result<SymbolCallersCommandResult, DrailError> {
     let scope = crate::engine::resolve_scope(scope);
     let bloom = crate::index::bloom::BloomFilterCache::new();
     let result = crate::search::callers::search_callers_structured(query, &scope, &bloom, None)?;
@@ -229,7 +229,7 @@ pub fn run_callers(
     Ok(command_result)
 }
 
-fn callers_diagnostics(query: &str, scope: &Path) -> Result<Vec<Diagnostic>, PatchError> {
+fn callers_diagnostics(query: &str, scope: &Path) -> Result<Vec<Diagnostic>, DrailError> {
     let symbol_result = crate::search::search_symbol_raw(query, scope)?;
     let definition_snippets = symbol_result
         .matches

@@ -6,16 +6,16 @@ use std::io::IsTerminal;
 
 use clap::Parser;
 
-use crate::error::PatchError;
+use crate::error::DrailError;
 use crate::output::{self, CommandOutput};
 
-pub fn run() -> Result<(), PatchError> {
+pub fn run() -> Result<(), DrailError> {
     let argv: Vec<OsString> = std::env::args_os().collect();
     let json_requested = argv.iter().any(|arg| arg == "--json");
     let cli = match args::Cli::try_parse_from(&argv) {
         Ok(cli) => cli,
         Err(error) => {
-            let error = PatchError::Clap {
+            let error = DrailError::Clap {
                 message: error.to_string().replace("Usage:", "USAGE:"),
                 exit_code: error.exit_code(),
             };
@@ -27,7 +27,7 @@ pub fn run() -> Result<(), PatchError> {
                 output::write_error(&output, false, std::io::stderr().is_terminal());
             }
 
-            return Err(PatchError::AlreadyReported {
+            return Err(DrailError::AlreadyReported {
                 exit_code: error.exit_code(),
             });
         }
@@ -36,7 +36,7 @@ pub fn run() -> Result<(), PatchError> {
     match dispatch::run(&cli) {
         Ok(()) => Ok(()),
         Err(error) => {
-            let cli = args::Cli::try_parse_from(&argv).map_err(|parse_error| PatchError::Clap {
+            let cli = args::Cli::try_parse_from(&argv).map_err(|parse_error| DrailError::Clap {
                 message: parse_error.to_string().replace("Usage:", "USAGE:"),
                 exit_code: parse_error.exit_code(),
             })?;
@@ -46,13 +46,13 @@ pub fn run() -> Result<(), PatchError> {
                 let output =
                     CommandOutput::from_error(dispatch::command_name(&cli.command), &error);
                 output::write(&output, true, std::io::stdout().is_terminal());
-                Err(PatchError::AlreadyReported { exit_code })
+                Err(DrailError::AlreadyReported { exit_code })
             } else {
                 let exit_code = error.exit_code();
                 let output =
                     CommandOutput::from_error(dispatch::command_name(&cli.command), &error);
                 output::write_error(&output, false, std::io::stderr().is_terminal());
-                Err(PatchError::AlreadyReported { exit_code })
+                Err(DrailError::AlreadyReported { exit_code })
             }
         }
     }

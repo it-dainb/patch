@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
-/// Every error patch can produce. Displayed as user-facing messages with suggestions.
+/// Every error drail can produce. Displayed as user-facing messages with suggestions.
 #[derive(Debug)]
-pub enum PatchError {
+pub enum DrailError {
     AlreadyReported {
         exit_code: i32,
     },
@@ -31,7 +31,7 @@ pub enum PatchError {
     },
 }
 
-impl std::fmt::Display for PatchError {
+impl std::fmt::Display for DrailError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::AlreadyReported { .. } => Ok(()),
@@ -59,9 +59,9 @@ impl std::fmt::Display for PatchError {
     }
 }
 
-impl std::error::Error for PatchError {}
+impl std::error::Error for DrailError {}
 
-impl PatchError {
+impl DrailError {
     /// Exit code matching the spec.
     #[must_use]
     pub fn exit_code(&self) -> i32 {

@@ -1,10 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 
-TARGET_DIR="${PATCH_INSTALL_DIR:-${HOME}/.local/bin}"
-TARGET_PATH="${TARGET_DIR}/patch"
-SOURCE_PATH="${PATCH_INSTALL_SOURCE:-$(pwd)/target/release/patch}"
-DRY_RUN="${PATCH_INSTALL_DRY_RUN:-0}"
+TARGET_DIR="${DRAIL_INSTALL_DIR:-${HOME}/.local/bin}"
+TARGET_PATH="${TARGET_DIR}/drail"
+SOURCE_PATH="${DRAIL_INSTALL_SOURCE:-$(pwd)/target/release/drail}"
+DRY_RUN="${DRAIL_INSTALL_DRY_RUN:-0}"
 
 path_contains_dir() {
     case ":${PATH}:" in
@@ -18,7 +18,7 @@ print_path_guidance() {
     printf '  export PATH="%s:$PATH"\n' "$TARGET_DIR"
 }
 
-printf 'Installing patch CLI to %s\n' "$TARGET_PATH"
+printf 'Installing drail CLI to %s\n' "$TARGET_PATH"
 
 if [ "$DRY_RUN" = "1" ]; then
     printf 'Dry run: would create %s if needed\n' "$TARGET_DIR"
@@ -31,7 +31,7 @@ fi
 
 if [ ! -f "$SOURCE_PATH" ]; then
     printf 'Error: source binary not found at %s\n' "$SOURCE_PATH" >&2
-    printf 'Build patch first (for example: cargo build --release).\n' >&2
+    printf 'Build drail first (for example: cargo build --release).\n' >&2
     exit 1
 fi
 
@@ -42,7 +42,7 @@ cp "$SOURCE_PATH" "$TMP_PATH"
 chmod +x "$TMP_PATH"
 mv "$TMP_PATH" "$TARGET_PATH"
 
-printf 'Installed patch CLI to %s\n' "$TARGET_PATH"
+printf 'Installed drail CLI to %s\n' "$TARGET_PATH"
 if ! path_contains_dir "$TARGET_DIR"; then
     print_path_guidance
 fi

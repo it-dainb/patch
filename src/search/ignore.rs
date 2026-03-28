@@ -1,14 +1,14 @@
 use std::path::Path;
 
-pub(crate) struct PatchignoreMatcher {
+pub(crate) struct DrailignoreMatcher {
     matcher: ::ignore::gitignore::Gitignore,
 }
 
-impl PatchignoreMatcher {
+impl DrailignoreMatcher {
     pub(crate) fn from_scope(scope: &Path) -> Self {
-        let patchignore = scope.join(".patchignore");
-        let matcher = if patchignore.is_file() {
-            ::ignore::gitignore::Gitignore::new(&patchignore).0
+        let drailignore = scope.join(".drailignore");
+        let matcher = if drailignore.is_file() {
+            ::ignore::gitignore::Gitignore::new(&drailignore).0
         } else {
             ::ignore::gitignore::Gitignore::empty()
         };
@@ -27,12 +27,12 @@ impl PatchignoreMatcher {
 mod tests {
     use std::path::Path;
 
-    use super::PatchignoreMatcher;
+    use super::DrailignoreMatcher;
 
     #[test]
-    fn matches_scope_root_patchignore_rules() {
-        let scope = Path::new("tests/fixtures/patchignore");
-        let matcher = PatchignoreMatcher::from_scope(scope);
+    fn matches_scope_root_drailignore_rules() {
+        let scope = Path::new("tests/fixtures/drailignore");
+        let matcher = DrailignoreMatcher::from_scope(scope);
 
         assert!(matcher.is_ignored(&scope.join("generated.gen.rs"), false));
         assert!(matcher.is_ignored(&scope.join("root-only.rs"), false));

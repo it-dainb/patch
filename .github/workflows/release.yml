@@ -83,7 +83,7 @@ jobs:
         if: matrix.os != 'windows-latest'
         run: |
           cd target/${{ matrix.target }}/release
-          tar czf ../../../patch-${{ matrix.target }}.tar.gz patch
+          tar czf ../../../drail-${{ matrix.target }}.tar.gz drail
           cd ../../..
 
       # Package — windows
@@ -92,15 +92,15 @@ jobs:
         shell: bash
         run: |
           cd target/${{ matrix.target }}/release
-          7z a ../../../patch-${{ matrix.target }}.zip patch.exe
+          7z a ../../../drail-${{ matrix.target }}.zip drail.exe
           cd ../../..
 
       # Upload to GitHub release
       - uses: softprops/action-gh-release@v2
         with:
           files: |
-            patch-*.tar.gz
-            patch-*.zip
+            drail-*.tar.gz
+            drail-*.zip
           generate_release_notes: true
 
   # After all builds, publish to crates.io

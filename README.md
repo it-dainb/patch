@@ -1,10 +1,10 @@
-# patch
+# drail
 
-**CLI-first code intelligence for AI agents.** patch gives agents a small, explicit command set for reading code, finding symbols, searching text, tracing callers, listing files, mapping a codebase, and checking file-level dependencies.
+**CLI-first code intelligence for AI agents.** drail gives agents a small, explicit command set for reading code, finding symbols, searching text, tracing callers, listing files, mapping a codebase, and checking file-level dependencies.
 
 The product goal is simple: make code navigation transparent, predictable, and cheap enough that an agent can recover from a bad query without spiraling into tool thrash.
 
-## Why patch exists
+## Why drail exists
 
 Generic shell tools force agents to compose too many steps:
 
@@ -14,21 +14,21 @@ Generic shell tools force agents to compose too many steps:
 - grep again
 - re-read a narrower slice
 
-patch turns those loops into explicit commands with stable output contracts. The CLI is the product. There is no query-classification shorthand, no hidden mode switch, and no host/editor install flow to understand before using it.
+drail turns those loops into explicit commands with stable output contracts. The CLI is the product. There is no query-classification shorthand, no hidden mode switch, and no host/editor install flow to understand before using it.
 
 ## Command families
 
-patch uses explicit subcommands only:
+drail uses explicit subcommands only:
 
 ```bash
-patch read <path>
-patch symbol find <query>
-patch symbol callers <query>
-patch search text <query>
-patch search regex <pattern>
-patch files <pattern>
-patch deps <path>
-patch map
+drail read <path>
+drail symbol find <query>
+drail symbol callers <query>
+drail search text <query>
+drail search regex <pattern>
+drail files <pattern>
+drail deps <path>
+drail map
 ```
 
 Every command supports:
@@ -41,17 +41,17 @@ Scope-aware commands also accept `--scope <dir>`.
 
 ## Scope ignore behavior
 
-When you pass `--scope <dir>`, patch reads at most one `.patchignore` file from the active scope root itself. patch does not look in parent directories, and it does not merge multiple ignore files.
+When you pass `--scope <dir>`, drail reads at most one `.drailignore` file from the active scope root itself. drail does not look in parent directories, and it does not merge multiple ignore files.
 
-Traversal commands honor that scope-root `.patchignore`: `files`, `symbol find`, `symbol callers`, `search text`, `search regex`, `deps`, and `map`.
+Traversal commands honor that scope-root `.drailignore`: `files`, `symbol find`, `symbol callers`, `search text`, `search regex`, `deps`, and `map`.
 
-Supported launch syntax is unchanged: point `--scope` at the directory whose root contains the `.patchignore` file you want honored.
+Supported launch syntax is unchanged: point `--scope` at the directory whose root contains the `.drailignore` file you want honored.
 
 ```bash
-cargo run -- files "*.rs" --scope tests/fixtures/patchignore
+cargo run -- files "*.rs" --scope tests/fixtures/drailignore
 ```
 
-In that example, only `tests/fixtures/patchignore/.patchignore` is read.
+In that example, only `tests/fixtures/drailignore/.drailignore` is read.
 
 .gitignore is not read.
 
@@ -84,7 +84,7 @@ cargo run -- read tests/fixtures/json/root-array.json --index 0:1
 cargo run -- read tests/fixtures/json/users.json --key users.0.accounts --index 0:1
 ```
 
-Use `read` when you already know the path and need exact content. Markdown `--lines` remains valid for arbitrary chunk reads; when the first selected line is itself a recognized heading, patch may also suggest a `--heading` follow-up to read the full section. JSON files always render as TOON text, including `--full` and selector reads. `--key` and `--index` are JSON-only selectors: `--key <PATH>` drills into a subtree using dot-separated object keys and numeric array segments, and `--index START:END` slices arrays with zero-based, end-exclusive bounds.
+Use `read` when you already know the path and need exact content. Markdown `--lines` remains valid for arbitrary chunk reads; when the first selected line is itself a recognized heading, drail may also suggest a `--heading` follow-up to read the full section. JSON files always render as TOON text, including `--full` and selector reads. `--key` and `--index` are JSON-only selectors: `--key <PATH>` drills into a subtree using dot-separated object keys and numeric array segments, and `--index START:END` slices arrays with zero-based, end-exclusive bounds.
 
 ### `symbol find`
 
@@ -133,7 +133,7 @@ Find files by glob.
 
 ```bash
 cargo run -- files "*.rs" --scope src
-cargo run -- files "*.rs" --scope tests/fixtures/patchignore
+cargo run -- files "*.rs" --scope tests/fixtures/drailignore
 ```
 
 Use `files` to narrow the surface area before reading or searching.
@@ -148,7 +148,7 @@ cargo run -- deps src/main.rs
 
 Use `deps` before moving, renaming, or heavily restructuring a file.
 
-If the target path is explicit, `deps` still accepts it even when that path matches `.patchignore`, but any traversal-derived results continue to honor the scope-root ignore rules.
+If the target path is explicit, `deps` still accepts it even when that path matches `.drailignore`, but any traversal-derived results continue to honor the scope-root ignore rules.
 
 ### `map`
 
@@ -162,7 +162,7 @@ Use `map` once when entering an unfamiliar repo, then switch to targeted command
 
 ## Output philosophy
 
-patch is designed for agent recovery, not just happy-path demos.
+drail is designed for agent recovery, not just happy-path demos.
 
 ### Text output
 
@@ -258,7 +258,7 @@ cargo run -- files "*.definitely-nope" --scope src --json
     {
       "kind": "suggestion",
       "message": "Try a broader or available file pattern for /abs/path/to/src",
-      "command": "patch files \"*.rs\" --scope /abs/path/to/src",
+      "command": "drail files \"*.rs\" --scope /abs/path/to/src",
       "confidence": "high"
     }
   ],
@@ -315,12 +315,12 @@ cargo run -- read README.md --lines 7:17
 ## Evidence
 # README.md (11 lines, ~103 tokens) [section]
 
- 7 │ ## Why patch exists
+ 7 │ ## Why drail exists
  8 │
  9 │ Generic shell tools force agents to compose too many steps:
 
 ## Next
-- Read the full markdown section starting at line 7 with --heading (command: patch read "README.md" --heading "## Why patch exists"; confidence: high)
+- Read the full markdown section starting at line 7 with --heading (command: drail read "README.md" --heading "## Why drail exists"; confidence: high)
 
 ## Diagnostics
 (none)
@@ -328,7 +328,7 @@ cargo run -- read README.md --lines 7:17
 
 ## Diagnostics and recovery
 
-patch does not silently reinterpret user intent.
+drail does not silently reinterpret user intent.
 
 - Wrong selector? Return an error diagnostic.
 - No matches? Return a sparse recovery hint plus a high-confidence `Next` suggestion when one is available.
@@ -362,7 +362,7 @@ For change planning:
 1. `deps <path>`
 2. `symbol callers <symbol>`
 
-When a scoped traversal misses an expected path, check the scope root for `.patchignore` before assuming the file is unavailable.
+When a scoped traversal misses an expected path, check the scope root for `.drailignore` before assuming the file is unavailable.
 
 ## Installation
 
@@ -394,7 +394,7 @@ cargo fmt --check
 
 ## Stability promises
 
-patch aims to keep these surfaces stable:
+drail aims to keep these surfaces stable:
 
 - explicit subcommand names
 - shared JSON envelope

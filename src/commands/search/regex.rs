@@ -1,11 +1,11 @@
 use crate::cli::args::SearchRegexArgs;
 use crate::engine::search;
-use crate::error::PatchError;
+use crate::error::DrailError;
 use crate::output::CommandOutput;
 use crate::output::{json, text};
 use serde_json::{json, Map, Value};
 
-pub fn run(args: &SearchRegexArgs) -> Result<CommandOutput, PatchError> {
+pub fn run(args: &SearchRegexArgs) -> Result<CommandOutput, DrailError> {
     let result = search::run_regex(&args.pattern, &args.scope, args.budget)?;
     let mut output = CommandOutput::with_parts(
         "search.regex",

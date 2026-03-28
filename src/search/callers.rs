@@ -10,7 +10,7 @@ use streaming_iterator::StreamingIterator;
 use super::treesitter::{extract_definition_name, DEFINITION_KINDS};
 
 use crate::cache::OutlineCache;
-use crate::error::PatchError;
+use crate::error::DrailError;
 use crate::read::detect_file_type;
 use crate::read::outline::code::outline_language;
 use crate::types::FileType;
@@ -67,7 +67,7 @@ pub fn find_callers(
     target: &str,
     scope: &Path,
     bloom: &crate::index::bloom::BloomFilterCache,
-) -> Result<Vec<CallerMatch>, PatchError> {
+) -> Result<Vec<CallerMatch>, DrailError> {
     let matches: Mutex<Vec<CallerMatch>> = Mutex::new(Vec::new());
     let found_count = AtomicUsize::new(0);
     let needle = target.as_bytes();
@@ -247,7 +247,7 @@ pub(crate) fn find_callers_batch(
     targets: &HashSet<String>,
     scope: &Path,
     bloom: &crate::index::bloom::BloomFilterCache,
-) -> Result<Vec<(String, CallerMatch)>, PatchError> {
+) -> Result<Vec<(String, CallerMatch)>, DrailError> {
     let matches: Mutex<Vec<(String, CallerMatch)>> = Mutex::new(Vec::new());
     let found_count = AtomicUsize::new(0);
 
@@ -499,7 +499,7 @@ pub fn search_callers_expanded(
     bloom: &crate::index::bloom::BloomFilterCache,
     _expand: usize,
     context: Option<&Path>,
-) -> Result<String, PatchError> {
+) -> Result<String, DrailError> {
     let result = search_callers_structured(target, scope, bloom, context)?;
 
     if result.callers.is_empty() {
@@ -576,7 +576,7 @@ pub fn search_callers_structured(
     scope: &Path,
     bloom: &crate::index::bloom::BloomFilterCache,
     context: Option<&Path>,
-) -> Result<CallerSearchResult, PatchError> {
+) -> Result<CallerSearchResult, DrailError> {
     let callers = find_callers(target, scope, bloom)?;
 
     if callers.is_empty() {
@@ -685,7 +685,7 @@ mod tests {
     #[test]
     fn find_callers_detects_simple_rust_fixture_callsite() {
         let bloom = BloomFilterCache::new();
-        let scope = Path::new("tests/fixtures/patchignore");
+        let scope = Path::new("tests/fixtures/drailignore");
 
         let callers = find_callers("visible_api", scope, &bloom).expect("caller search succeeds");
 

@@ -4,7 +4,7 @@ use std::sync::Mutex;
 
 use super::file_metadata;
 
-use crate::error::PatchError;
+use crate::error::DrailError;
 use crate::search::rank;
 use crate::types::{Match, SearchResult};
 use grep_regex::RegexMatcher;
@@ -21,13 +21,13 @@ pub fn search(
     scope: &Path,
     is_regex: bool,
     context: Option<&Path>,
-) -> Result<SearchResult, PatchError> {
+) -> Result<SearchResult, DrailError> {
     let matcher = if is_regex {
         RegexMatcher::new(pattern)
     } else {
         RegexMatcher::new(&regex_syntax::escape(pattern))
     }
-    .map_err(|e| PatchError::InvalidQuery {
+    .map_err(|e| DrailError::InvalidQuery {
         query: pattern.to_string(),
         reason: e.to_string(),
     })?;

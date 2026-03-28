@@ -6,31 +6,31 @@ use std::process::Output;
 use assert_cmd::Command;
 use serde_json::Value;
 
-const PATCHIGNORE_SCOPE: &str = "tests/fixtures/patchignore";
+const DRAILIGNORE_SCOPE: &str = "tests/fixtures/drailignore";
 
-fn run_patch<I, S>(args: I) -> Output
+fn run_drail<I, S>(args: I) -> Output
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    Command::cargo_bin("patch")
-        .expect("patch binary should build for integration tests")
+    Command::cargo_bin("drail")
+        .expect("drail binary should build for integration tests")
         .args(args)
         .output()
-        .expect("patch should execute")
+        .expect("drail should execute")
 }
 
-fn run_patch_from<I, S>(args: I, cwd: &Path) -> Output
+fn run_drail_from<I, S>(args: I, cwd: &Path) -> Output
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    Command::cargo_bin("patch")
-        .expect("patch binary should build for integration tests")
+    Command::cargo_bin("drail")
+        .expect("drail binary should build for integration tests")
         .current_dir(cwd)
         .args(args)
         .output()
-        .expect("patch should execute")
+        .expect("drail should execute")
 }
 
 fn stdout(output: &Output) -> String {
@@ -51,12 +51,12 @@ fn assert_success(output: &Output) {
     );
 }
 
-fn run_patch_json<I, S>(args: I) -> Value
+fn run_drail_json<I, S>(args: I) -> Value
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    let output = run_patch(args);
+    let output = run_drail(args);
     assert_success(&output);
     serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
         panic!(
@@ -67,12 +67,12 @@ where
     })
 }
 
-fn run_patch_json_from<I, S>(args: I, cwd: &Path) -> Value
+fn run_drail_json_from<I, S>(args: I, cwd: &Path) -> Value
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    let output = run_patch_from(args, cwd);
+    let output = run_drail_from(args, cwd);
     assert_success(&output);
     serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
         panic!(
@@ -100,7 +100,7 @@ fn matches(value: &Value) -> &[Value] {
 
 #[test]
 fn symbol_find_returns_definitions_before_usages() {
-    let value = run_patch_json(["symbol", "find", "main", "--scope", "src", "--json"]);
+    let value = run_drail_json(["symbol", "find", "main", "--scope", "src", "--json"]);
     let matches = matches(&value);
 
     assert_eq!(value["schema_version"], 2);
@@ -116,7 +116,7 @@ fn symbol_find_returns_definitions_before_usages() {
 
 #[test]
 fn symbol_find_kind_definition_filters_to_definitions_only() {
-    let value = run_patch_json([
+    let value = run_drail_json([
         "symbol",
         "find",
         "common",
@@ -150,7 +150,7 @@ fn symbol_find_kind_definition_filters_to_definitions_only() {
 
 #[test]
 fn symbol_find_kind_usage_filters_to_usages_only() {
-    let value = run_patch_json([
+    let value = run_drail_json([
         "symbol",
         "find",
         "common",
@@ -168,7 +168,7 @@ fn symbol_find_kind_usage_filters_to_usages_only() {
 
 #[test]
 fn symbol_find_no_match_reports_one_recovery_suggestion() {
-    let value = run_patch_json([
+    let value = run_drail_json([
         "symbol",
         "find",
         "definitely_missing_symbol_xyz",
@@ -203,7 +203,7 @@ fn symbol_find_no_match_reports_one_recovery_suggestion() {
 
 #[test]
 fn symbol_find_multiple_definition_matches_use_stable_ordering() {
-    let value = run_patch_json([
+    let value = run_drail_json([
         "symbol",
         "find",
         "render",
@@ -237,7 +237,7 @@ fn symbol_find_multiple_definition_matches_use_stable_ordering() {
 
 #[test]
 fn symbol_find_text_no_match_includes_single_next_step_hint() {
-    let output = run_patch([
+    let output = run_drail([
         "symbol",
         "find",
         "definitely_missing_symbol_xyz",
@@ -249,16 +249,16 @@ fn symbol_find_text_no_match_includes_single_next_step_hint() {
     assert_success(&output);
     assert!(text.contains("## Next"), "expected Next block: {text}");
     assert!(
-        text.contains("patch symbol find")
-            || text.contains("patch files")
-            || text.contains("patch search"),
+        text.contains("drail symbol find")
+            || text.contains("drail files")
+            || text.contains("drail search"),
         "expected a next-step suggestion in text output: {text}"
     );
 }
 
 #[test]
 fn symbol_find_no_match_guidance_renders_in_next_section() {
-    let output = run_patch([
+    let output = run_drail([
         "symbol",
         "find",
         "definitely_missing_symbol_xyz",
@@ -285,19 +285,19 @@ fn symbol_find_no_match_guidance_renders_in_next_section() {
         "expected Evidence to stay evidentiary only: {text}"
     );
     assert!(
-        next.contains("patch search text"),
+        next.contains("drail search text"),
         "expected recovery guidance in Next section: {text}"
     );
 }
 
 #[test]
-fn symbol_find_excludes_patchignored_definitions() {
-    let value = run_patch_json([
+fn symbol_find_excludes_drailignored_definitions() {
+    let value = run_drail_json([
         "symbol",
         "find",
         "ignored_api",
         "--scope",
-        PATCHIGNORE_SCOPE,
+        DRAILIGNORE_SCOPE,
         "--kind",
         "definition",
         "--json",
@@ -311,8 +311,8 @@ fn symbol_find_excludes_patchignored_definitions() {
 
 #[test]
 fn symbol_find_scope_dot_uses_invoking_cwd() {
-    let fixture_dir = fixture_dir_from_repo("tests/fixtures/patchignore");
-    let value = run_patch_json_from(
+    let fixture_dir = fixture_dir_from_repo("tests/fixtures/drailignore");
+    let value = run_drail_json_from(
         ["symbol", "find", "visible_api", "--scope", ".", "--json"],
         &fixture_dir,
     );

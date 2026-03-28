@@ -4,16 +4,16 @@ use std::process::Output;
 use assert_cmd::Command;
 use serde_json::Value;
 
-fn run_patch<I, S>(args: I) -> Output
+fn run_drail<I, S>(args: I) -> Output
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    Command::cargo_bin("patch")
-        .expect("patch binary should build for integration tests")
+    Command::cargo_bin("drail")
+        .expect("drail binary should build for integration tests")
         .args(args)
         .output()
-        .expect("patch should execute")
+        .expect("drail should execute")
 }
 
 fn stdout(output: &Output) -> String {
@@ -44,22 +44,22 @@ fn assert_failure(output: &Output) {
     );
 }
 
-fn run_patch_json<I, S>(args: I) -> Value
+fn run_drail_json<I, S>(args: I) -> Value
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    let output = run_patch(args);
+    let output = run_drail(args);
     assert_success(&output);
     parse_json_stdout(&output)
 }
 
-fn run_patch_json_failure<I, S>(args: I) -> Value
+fn run_drail_json_failure<I, S>(args: I) -> Value
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    let output = run_patch(args);
+    let output = run_drail(args);
     assert_failure(&output);
     parse_json_stdout(&output)
 }
@@ -256,7 +256,7 @@ fn schema_version_is_2_for_all_json_commands() {
     ];
 
     for (args, command) in cases {
-        let value = run_patch_json(args);
+        let value = run_drail_json(args);
         assert_v2_envelope(&value, command);
     }
 }
@@ -273,7 +273,7 @@ fn text_output_uses_v2_section_order() {
     ];
 
     for args in cases {
-        let output = run_patch(args);
+        let output = run_drail(args);
         assert_success(&output);
         assert_text_section_order_v2(&stdout(&output));
     }
@@ -310,7 +310,7 @@ fn next_items_follow_v2_object_shape() {
     ];
 
     for (args, command) in cases {
-        let value = run_patch_json(args);
+        let value = run_drail_json(args);
         assert_v2_envelope(&value, command);
         let next = next_items(&value, command);
         assert!(
@@ -338,7 +338,7 @@ fn successful_commands_do_not_emit_placeholder_success_diagnostics() {
     ];
 
     for (args, command) in cases {
-        let value = run_patch_json(args);
+        let value = run_drail_json(args);
         let diagnostics = diagnostics(&value, command);
         assert!(
             diagnostics.is_empty(),
@@ -349,7 +349,7 @@ fn successful_commands_do_not_emit_placeholder_success_diagnostics() {
 
 #[test]
 fn text_output_renders_none_for_empty_next_and_diagnostics() {
-    let output = run_patch(["map", "--scope", "src"]);
+    let output = run_drail(["map", "--scope", "src"]);
 
     assert_success(&output);
     let text = stdout(&output);
@@ -363,7 +363,7 @@ fn text_output_renders_none_for_empty_next_and_diagnostics() {
 
 #[test]
 fn json_errors_use_schema_version_2() {
-    let value = run_patch_json_failure(["search", "regex", "(", "--scope", "src", "--json"]);
+    let value = run_drail_json_failure(["search", "regex", "(", "--scope", "src", "--json"]);
     assert_v2_envelope(&value, "search.regex");
     assert_eq!(
         value["ok"], false,
@@ -381,7 +381,7 @@ fn json_errors_use_schema_version_2() {
 
 #[test]
 fn json_errors_emit_empty_next_and_meta_objects_when_needed() {
-    let value = run_patch_json_failure(["deps", "render", "--scope", "src", "--json"]);
+    let value = run_drail_json_failure(["deps", "render", "--scope", "src", "--json"]);
     assert_v2_envelope(&value, "deps");
     assert_eq!(
         value["ok"], false,
@@ -399,7 +399,7 @@ fn json_errors_emit_empty_next_and_meta_objects_when_needed() {
 
 #[test]
 fn invalid_query_text_output_uses_v2_error_sections() {
-    let output = run_patch(["read", "README.md", "--lines", "4:1"]);
+    let output = run_drail(["read", "README.md", "--lines", "4:1"]);
     assert_failure(&output);
 
     let text = stderr(&output);
@@ -420,7 +420,7 @@ fn invalid_query_text_output_uses_v2_error_sections() {
 
 #[test]
 fn read_json_selector_contract_uses_key_index_variants() {
-    let key = run_patch_json([
+    let key = run_drail_json([
         "read",
         "tests/fixtures/json/users.json",
         "--key",
@@ -446,7 +446,7 @@ fn read_json_selector_contract_uses_key_index_variants() {
         "expected key selector enum shape in read.data.selector: {key:#}"
     );
 
-    let index = run_patch_json([
+    let index = run_drail_json([
         "read",
         "tests/fixtures/json/root-array.json",
         "--index",
@@ -472,7 +472,7 @@ fn read_json_selector_contract_uses_key_index_variants() {
         "expected index selector enum shape in read.data.selector: {index:#}"
     );
 
-    let key_index = run_patch_json([
+    let key_index = run_drail_json([
         "read",
         "tests/fixtures/json/users.json",
         "--key",

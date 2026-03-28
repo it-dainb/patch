@@ -3,7 +3,7 @@ use std::path::Path;
 
 use serde::Serialize;
 
-use crate::error::PatchError;
+use crate::error::DrailError;
 use crate::output::json::envelope::Diagnostic;
 
 #[derive(Debug, Clone, Serialize)]
@@ -42,9 +42,9 @@ pub struct DepsCommandResult {
     pub diagnostics: Vec<Diagnostic>,
 }
 
-pub fn run(path: &Path, scope: &Path) -> Result<DepsCommandResult, PatchError> {
+pub fn run(path: &Path, scope: &Path) -> Result<DepsCommandResult, DrailError> {
     if !path.exists() {
-        return Err(PatchError::NotFound {
+        return Err(DrailError::NotFound {
             path: path.to_path_buf(),
             suggestion: None,
         });

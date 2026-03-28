@@ -4,16 +4,16 @@ use std::process::Output;
 use assert_cmd::Command;
 use serde_json::Value;
 
-fn run_patch<I, S>(args: I) -> Output
+fn run_drail<I, S>(args: I) -> Output
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    Command::cargo_bin("patch")
-        .expect("patch binary should build for integration tests")
+    Command::cargo_bin("drail")
+        .expect("drail binary should build for integration tests")
         .args(args)
         .output()
-        .expect("patch should execute")
+        .expect("drail should execute")
 }
 
 fn stdout(output: &Output) -> String {
@@ -72,12 +72,12 @@ fn assert_toon_success_baseline(text: &str) {
     assert_not_contains(evidence, "{\n");
 }
 
-fn run_patch_json<I, S>(args: I) -> Value
+fn run_drail_json<I, S>(args: I) -> Value
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    let output = run_patch(args);
+    let output = run_drail(args);
     assert_success(&output);
     serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
         panic!(
@@ -114,7 +114,7 @@ fn assert_has_no_heading_suggestion(next: &[Value], context: &Value) {
 
 #[test]
 fn read_path_renders_file_contents() {
-    let output = run_patch(["read", "src/commands/read.rs"]);
+    let output = run_drail(["read", "src/commands/read.rs"]);
 
     assert_success(&output);
     assert_contains(&stdout(&output), "pub fn run(args: &ReadArgs)");
@@ -122,11 +122,11 @@ fn read_path_renders_file_contents() {
 
 #[test]
 fn read_lines_renders_only_requested_range() {
-    let output = run_patch(["read", "README.md", "--lines", "1:5"]);
+    let output = run_drail(["read", "README.md", "--lines", "1:5"]);
     let text = stdout(&output);
 
     assert_success(&output);
-    assert_contains(&text, "1 │ # patch");
+    assert_contains(&text, "1 │ # drail");
     assert_contains(&text, "5 │ The product goal is simple");
     assert!(
         !text.contains("## Command families"),
@@ -136,7 +136,7 @@ fn read_lines_renders_only_requested_range() {
 
 #[test]
 fn read_json_data_contains_v2_meta() {
-    let value = run_patch_json(["read", "README.md", "--lines", "1:5", "--json"]);
+    let value = run_drail_json(["read", "README.md", "--lines", "1:5", "--json"]);
 
     assert_eq!(value["command"], "read");
     assert_eq!(value["schema_version"], 2);
@@ -166,7 +166,7 @@ fn read_json_data_contains_v2_meta() {
 
 #[test]
 fn read_heading_renders_markdown_section() {
-    let output = run_patch(["read", "README.md", "--heading", "## Installation"]);
+    let output = run_drail(["read", "README.md", "--heading", "## Installation"]);
     let text = stdout(&output);
 
     assert_success(&output);
@@ -180,7 +180,7 @@ fn read_heading_renders_markdown_section() {
 
 #[test]
 fn read_markdown_lines_suggests_heading_when_heading_aligned() {
-    let value = run_patch_json(["read", "README.md", "--lines", "19:22", "--json"]);
+    let value = run_drail_json(["read", "README.md", "--lines", "19:22", "--json"]);
 
     let next = value["next"].as_array().unwrap_or_else(|| {
         panic!(
@@ -193,7 +193,7 @@ fn read_markdown_lines_suggests_heading_when_heading_aligned() {
 
 #[test]
 fn read_markdown_lines_without_heading_alignment_has_no_heading_hint() {
-    let value = run_patch_json(["read", "README.md", "--lines", "21:24", "--json"]);
+    let value = run_drail_json(["read", "README.md", "--lines", "21:24", "--json"]);
 
     let next = value["next"].as_array().unwrap_or_else(|| {
         panic!(
@@ -206,7 +206,7 @@ fn read_markdown_lines_without_heading_alignment_has_no_heading_hint() {
 
 #[test]
 fn read_markdown_lines_starting_before_heading_has_no_heading_hint() {
-    let value = run_patch_json(["read", "README.md", "--lines", "17:21", "--json"]);
+    let value = run_drail_json(["read", "README.md", "--lines", "17:21", "--json"]);
 
     let next = value["next"].as_array().unwrap_or_else(|| {
         panic!(
@@ -219,7 +219,7 @@ fn read_markdown_lines_starting_before_heading_has_no_heading_hint() {
 
 #[test]
 fn read_rejects_lines_and_heading_together() {
-    let output = run_patch([
+    let output = run_drail([
         "read",
         "README.md",
         "--lines",
@@ -234,7 +234,7 @@ fn read_rejects_lines_and_heading_together() {
 
 #[test]
 fn read_rejects_heading_for_non_markdown_files() {
-    let output = run_patch([
+    let output = run_drail([
         "read",
         "src/commands/read.rs",
         "--heading",
@@ -247,10 +247,10 @@ fn read_rejects_heading_for_non_markdown_files() {
 }
 
 #[test]
-fn read_explicit_patchignored_path_still_succeeds() {
-    let output = run_patch([
+fn read_explicit_drailignored_path_still_succeeds() {
+    let output = run_drail([
         "read",
-        "tests/fixtures/patchignore/ignored-dir/ignored_api.rs",
+        "tests/fixtures/drailignore/ignored-dir/ignored_api.rs",
     ]);
     let text = stdout(&output);
 
@@ -261,7 +261,7 @@ fn read_explicit_patchignored_path_still_succeeds() {
 
 #[test]
 fn read_json_renders_toon_for_full_file() {
-    let output = run_patch(["read", "tests/fixtures/json/users.json"]);
+    let output = run_drail(["read", "tests/fixtures/json/users.json"]);
     let text = stdout(&output);
 
     assert_success(&output);
@@ -272,7 +272,7 @@ fn read_json_renders_toon_for_full_file() {
 
 #[test]
 fn read_json_full_flag_still_renders_toon() {
-    let output = run_patch(["read", "tests/fixtures/json/users.json", "--full"]);
+    let output = run_drail(["read", "tests/fixtures/json/users.json", "--full"]);
     let text = stdout(&output);
 
     assert_success(&output);
@@ -283,7 +283,7 @@ fn read_json_full_flag_still_renders_toon() {
 
 #[test]
 fn read_json_key_renders_selected_subtree() {
-    let output = run_patch(["read", "tests/fixtures/json/users.json", "--key", "meta"]);
+    let output = run_drail(["read", "tests/fixtures/json/users.json", "--key", "meta"]);
     let text = stdout(&output);
 
     assert_success(&output);
@@ -295,7 +295,7 @@ fn read_json_key_renders_selected_subtree() {
 
 #[test]
 fn read_json_key_and_index_slice_selected_array() {
-    let output = run_patch([
+    let output = run_drail([
         "read",
         "tests/fixtures/json/users.json",
         "--key",
@@ -315,7 +315,7 @@ fn read_json_key_and_index_slice_selected_array() {
 
 #[test]
 fn read_json_nested_numeric_key_path_resolves() {
-    let output = run_patch([
+    let output = run_drail([
         "read",
         "tests/fixtures/json/users.json",
         "--key",
@@ -331,7 +331,7 @@ fn read_json_nested_numeric_key_path_resolves() {
 
 #[test]
 fn read_json_root_array_index_slice_renders_toon() {
-    let output = run_patch([
+    let output = run_drail([
         "read",
         "tests/fixtures/json/root-array.json",
         "--index",
@@ -350,7 +350,7 @@ fn read_json_root_array_index_slice_renders_toon() {
 
 #[test]
 fn read_rejects_key_with_lines_or_heading() {
-    let lines_output = run_patch([
+    let lines_output = run_drail([
         "read",
         "tests/fixtures/json/users.json",
         "--key",
@@ -364,7 +364,7 @@ fn read_rejects_key_with_lines_or_heading() {
         "--key <KEY>' cannot be used with '--lines",
     );
 
-    let heading_output = run_patch([
+    let heading_output = run_drail([
         "read",
         "tests/fixtures/json/users.json",
         "--key",
@@ -381,7 +381,7 @@ fn read_rejects_key_with_lines_or_heading() {
 
 #[test]
 fn read_rejects_index_with_lines_or_heading() {
-    let lines_output = run_patch([
+    let lines_output = run_drail([
         "read",
         "tests/fixtures/json/users.json",
         "--index",
@@ -395,7 +395,7 @@ fn read_rejects_index_with_lines_or_heading() {
         "--index <START:END>' cannot be used with '--lines",
     );
 
-    let heading_output = run_patch([
+    let heading_output = run_drail([
         "read",
         "tests/fixtures/json/users.json",
         "--index",
@@ -412,7 +412,7 @@ fn read_rejects_index_with_lines_or_heading() {
 
 #[test]
 fn read_rejects_key_for_non_json_files() {
-    let output = run_patch(["read", "README.md", "--key", "users"]);
+    let output = run_drail(["read", "README.md", "--key", "users"]);
 
     assert_failure(&output);
     assert_contains(&stderr(&output), "--key is only supported for JSON files");
@@ -420,7 +420,7 @@ fn read_rejects_key_for_non_json_files() {
 
 #[test]
 fn read_rejects_index_for_non_json_files() {
-    let output = run_patch(["read", "README.md", "--index", "0:1"]);
+    let output = run_drail(["read", "README.md", "--index", "0:1"]);
 
     assert_failure(&output);
     assert_contains(&stderr(&output), "--index is only supported for JSON files");
@@ -428,7 +428,7 @@ fn read_rejects_index_for_non_json_files() {
 
 #[test]
 fn read_json_invalid_key_path_fails() {
-    let output = run_patch([
+    let output = run_drail([
         "read",
         "tests/fixtures/json/users.json",
         "--key",
@@ -441,7 +441,7 @@ fn read_json_invalid_key_path_fails() {
 
 #[test]
 fn read_json_invalid_index_syntax_fails() {
-    let output = run_patch([
+    let output = run_drail([
         "read",
         "tests/fixtures/json/root-array.json",
         "--index",
@@ -454,7 +454,7 @@ fn read_json_invalid_index_syntax_fails() {
 
 #[test]
 fn read_json_out_of_range_index_fails() {
-    let output = run_patch([
+    let output = run_drail([
         "read",
         "tests/fixtures/json/users.json",
         "--key",
@@ -469,7 +469,7 @@ fn read_json_out_of_range_index_fails() {
 
 #[test]
 fn read_json_invalid_parse_fails() {
-    let output = run_patch(["read", "tests/fixtures/json/invalid.json"]);
+    let output = run_drail(["read", "tests/fixtures/json/invalid.json"]);
 
     assert_failure(&output);
     assert_contains(&stderr(&output), "invalid JSON");

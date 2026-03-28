@@ -1,5 +1,5 @@
 {
-  description = "patch — tree-sitter indexed lookups — smart code reading for AI agents";
+  description = "drail — tree-sitter indexed lookups — smart code reading for AI agents";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
 
@@ -27,9 +27,9 @@
             cargoLock.lockFile = ./Cargo.lock;
             meta = {
               inherit (cargoToml.package) description;
-              homepage = "https://github.com/it-dainb/patch";
+              homepage = "https://github.com/it-dainb/drail";
               license = lib.licenses.mit;
-              mainProgram = "patch";
+              mainProgram = "drail";
             };
           };
         }

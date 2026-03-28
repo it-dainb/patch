@@ -3,7 +3,7 @@ use std::path::Path;
 use serde::Serialize;
 
 use crate::cache::OutlineCache;
-use crate::error::PatchError;
+use crate::error::DrailError;
 use crate::output::json::envelope::Diagnostic;
 
 #[derive(Debug, Clone, Serialize)]
@@ -34,7 +34,7 @@ pub fn run(
     scope: &Path,
     depth: usize,
     budget: Option<u64>,
-) -> Result<MapCommandResult, PatchError> {
+) -> Result<MapCommandResult, DrailError> {
     let cache = OutlineCache::new();
     let scope = crate::engine::resolve_scope(scope);
     let full_map = crate::map::generate(&scope, depth, None, &cache);

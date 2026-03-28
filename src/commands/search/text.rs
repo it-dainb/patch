@@ -1,12 +1,12 @@
 use crate::cli::args::SearchTextArgs;
 use crate::engine::search;
-use crate::error::PatchError;
+use crate::error::DrailError;
 use crate::output::json::envelope::NextItem;
 use crate::output::CommandOutput;
 use crate::output::{json, text};
 use serde_json::{json, Map, Value};
 
-pub fn run(args: &SearchTextArgs) -> Result<CommandOutput, PatchError> {
+pub fn run(args: &SearchTextArgs) -> Result<CommandOutput, DrailError> {
     let result = search::run_text(&args.query, &args.scope, args.budget)?;
     let next = next_for_search(&result);
     let diagnostics = diagnostics_without_suggestions(&result.diagnostics);
@@ -41,7 +41,7 @@ fn next_for_search(result: &search::SearchCommandResult) -> Vec<NextItem> {
         return vec![crate::output::suggestion(
             "Retry this search using regex mode for slash-delimited input",
             format!(
-                "patch search regex {:?} --scope {}",
+                "drail search regex {:?} --scope {}",
                 &result.data.query[1..result.data.query.len() - 1],
                 result.data.scope
             ),

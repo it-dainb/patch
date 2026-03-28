@@ -1,4 +1,4 @@
-# patch
+# drail
 
 Rust CLI for AST-aware code intelligence. The product is an explicit subcommand-based command line for AI agents first and humans second. It exposes stable text and JSON output for reading files, finding symbols, tracing callers, searching text/regex, listing files, mapping a repo, and checking file-level dependencies.
 
@@ -35,14 +35,14 @@ docs/cli-contract.md   Public command/output contract.
 ## Public CLI surface
 
 ```bash
-patch read <path>
-patch symbol find <query>
-patch symbol callers <query>
-patch search text <query>
-patch search regex <pattern>
-patch files <pattern>
-patch deps <path>
-patch map
+drail read <path>
+drail symbol find <query>
+drail symbol callers <query>
+drail search text <query>
+drail search regex <pattern>
+drail files <pattern>
+drail deps <path>
+drail map
 ```
 
 Shared flags:

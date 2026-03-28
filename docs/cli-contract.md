@@ -1,6 +1,6 @@
 # CLI contract
 
-`patch` is a subcommand-only CLI for AI-agent-first code navigation. This document captures the public command surface and the output contract that the integration tests pin.
+`drail` is a subcommand-only CLI for AI-agent-first code navigation. This document captures the public command surface and the output contract that the integration tests pin.
 
 ## Command families
 
@@ -31,15 +31,15 @@ There is no query-shorthand mode, no MCP runtime, and no editor/host install flo
 
 ## Scope ignore contract
 
-When a command accepts `--scope <dir>`, patch may read one `.patchignore` file from that active scope root. only one .patchignore at the scope root is read.
+When a command accepts `--scope <dir>`, drail may read one `.drailignore` file from that active scope root. only one .drailignore at the scope root is read.
 
-patch does not look up parent directories for additional ignore rules, does not merge nested `.patchignore` files, and .gitignore is not read.
+drail does not look up parent directories for additional ignore rules, does not merge nested `.drailignore` files, and .gitignore is not read.
 
 Traversal commands honor that file. Traversal commands honor that file: `files`, `symbol find`, `symbol callers`, `search text`, `search regex`, `deps`, and `map`.
 
 Scope behavior stays explicit:
 
-- launch the command with `--scope <dir>` pointing at the directory whose root owns the `.patchignore`
+- launch the command with `--scope <dir>` pointing at the directory whose root owns the `.drailignore`
 - root-relative ignore rules are evaluated against that scope root only
 - `read` still accepts an explicit ignored path because it does not depend on traversal; read still accepts an explicit ignored path
 - deps accepts an explicit ignored target path but filters traversal-derived results
@@ -79,7 +79,7 @@ Each `next` item uses this shape:
 {
   "kind": "suggestion",
   "message": "Read the full markdown section starting at line 7 with --heading",
-  "command": "patch read \"README.md\" --heading \"## Why patch exists\"",
+  "command": "drail read \"README.md\" --heading \"## Why drail exists\"",
   "confidence": "high"
 }
 ```
@@ -194,13 +194,13 @@ Stable JSON read error substrings callers can rely on:
 - `index range starts at`
 - `failed to encode JSON as TOON`
 
-Traversal-derived command payloads exclude paths filtered by the active scope root `.patchignore`. That filtering affects discovered matches, callers, reverse dependencies, and map entries, but does not change the command names, shared flags, JSON envelope keys, or text section ordering.
+Traversal-derived command payloads exclude paths filtered by the active scope root `.drailignore`. That filtering affects discovered matches, callers, reverse dependencies, and map entries, but does not change the command names, shared flags, JSON envelope keys, or text section ordering.
 
 ### Markdown heading guidance rule for `read`
 
-`read --lines` remains valid for markdown in general. patch adds a heading-oriented suggestion only when the first selected line itself is recognized as a markdown heading by the existing heading parser.
+`read --lines` remains valid for markdown in general. drail adds a heading-oriented suggestion only when the first selected line itself is recognized as a markdown heading by the existing heading parser.
 
-That means patch does **not** emit the heading suggestion when:
+That means drail does **not** emit the heading suggestion when:
 
 - a heading appears later in the selected range
 - the selection starts inside section body text

@@ -6,7 +6,7 @@ const { execFileSync } = require("child_process");
 const path = require("path");
 
 const isWindows = process.platform === "win32";
-const binName = isWindows ? "patch.exe" : "patch";
+const binName = isWindows ? "drail.exe" : "drail";
 const bin = path.join(__dirname, "bin", binName);
 
 try {
@@ -15,7 +15,7 @@ try {
   if (err.status != null) {
     process.exit(err.status);
   }
-  console.error(`patch: failed to run binary at ${bin}`);
+  console.error(`drail: failed to run binary at ${bin}`);
   console.error(err.message);
   process.exit(1);
 }

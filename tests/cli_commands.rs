@@ -4,16 +4,16 @@ use std::process::Output;
 use assert_cmd::Command;
 use serde_json::Value;
 
-fn run_patch<I, S>(args: I) -> Output
+fn run_drail<I, S>(args: I) -> Output
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    Command::cargo_bin("patch")
-        .expect("patch binary should build for integration tests")
+    Command::cargo_bin("drail")
+        .expect("drail binary should build for integration tests")
         .args(args)
         .output()
-        .expect("patch should execute")
+        .expect("drail should execute")
 }
 
 fn stdout(output: &Output) -> String {
@@ -67,7 +67,7 @@ fn parse_json_stdout(output: &Output) -> Value {
 
 #[test]
 fn read_requires_path_arg() {
-    let output = run_patch(["read"]);
+    let output = run_drail(["read"]);
 
     assert_failure(&output);
     assert_contains(&stderr(&output), "USAGE:");
@@ -75,14 +75,14 @@ fn read_requires_path_arg() {
 
 #[test]
 fn symbol_find_is_a_valid_command() {
-    let output = run_patch(["symbol", "find", "main", "--scope", "src"]);
+    let output = run_drail(["symbol", "find", "main", "--scope", "src"]);
 
     assert_success(&output);
 }
 
 #[test]
 fn help_lists_only_current_command_families() {
-    let output = run_patch(["--help"]);
+    let output = run_drail(["--help"]);
     let text = combined_output(&output);
 
     assert_success(&output);
@@ -101,7 +101,7 @@ fn help_lists_only_current_command_families() {
 
 #[test]
 fn symbol_help_lists_find_and_callers_subcommands() {
-    let output = run_patch(["symbol", "--help"]);
+    let output = run_drail(["symbol", "--help"]);
     let text = combined_output(&output);
 
     assert_success(&output);
@@ -111,7 +111,7 @@ fn symbol_help_lists_find_and_callers_subcommands() {
 
 #[test]
 fn search_help_lists_text_and_regex_subcommands() {
-    let output = run_patch(["search", "--help"]);
+    let output = run_drail(["search", "--help"]);
     let text = combined_output(&output);
 
     assert_success(&output);
@@ -121,7 +121,7 @@ fn search_help_lists_text_and_regex_subcommands() {
 
 #[test]
 fn bare_unknown_command_is_rejected() {
-    let output = run_patch(["foo"]);
+    let output = run_drail(["foo"]);
 
     assert_failure(&output);
     assert_contains(&stderr(&output), "unrecognized subcommand 'foo'");
@@ -129,7 +129,7 @@ fn bare_unknown_command_is_rejected() {
 
 #[test]
 fn read_section_flag_is_rejected() {
-    let output = run_patch(["read", "x", "--section", "1-9"]);
+    let output = run_drail(["read", "x", "--section", "1-9"]);
 
     assert_failure(&output);
     assert_contains(&stderr(&output), "unexpected argument '--section'");
@@ -137,7 +137,7 @@ fn read_section_flag_is_rejected() {
 
 #[test]
 fn unknown_command_json_uses_v2_error_envelope() {
-    let output = run_patch(["foo", "--json"]);
+    let output = run_drail(["foo", "--json"]);
 
     assert_failure(&output);
     let value = parse_json_stdout(&output);
@@ -154,7 +154,7 @@ fn unknown_command_json_uses_v2_error_envelope() {
 
 #[test]
 fn missing_path_json_uses_v2_error_envelope() {
-    let output = run_patch(["read", "--json"]);
+    let output = run_drail(["read", "--json"]);
 
     assert_failure(&output);
     let value = parse_json_stdout(&output);

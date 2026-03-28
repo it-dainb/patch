@@ -6,31 +6,31 @@ use std::process::Output;
 use assert_cmd::Command;
 use serde_json::Value;
 
-const PATCHIGNORE_SCOPE: &str = "tests/fixtures/patchignore";
+const DRAILIGNORE_SCOPE: &str = "tests/fixtures/drailignore";
 
-fn run_patch<I, S>(args: I) -> Output
+fn run_drail<I, S>(args: I) -> Output
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    Command::cargo_bin("patch")
-        .expect("patch binary should build for integration tests")
+    Command::cargo_bin("drail")
+        .expect("drail binary should build for integration tests")
         .args(args)
         .output()
-        .expect("patch should execute")
+        .expect("drail should execute")
 }
 
-fn run_patch_from<I, S>(args: I, cwd: &Path) -> Output
+fn run_drail_from<I, S>(args: I, cwd: &Path) -> Output
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    Command::cargo_bin("patch")
-        .expect("patch binary should build for integration tests")
+    Command::cargo_bin("drail")
+        .expect("drail binary should build for integration tests")
         .current_dir(cwd)
         .args(args)
         .output()
-        .expect("patch should execute")
+        .expect("drail should execute")
 }
 
 fn stdout(output: &Output) -> String {
@@ -51,12 +51,12 @@ fn assert_success(output: &Output) {
     );
 }
 
-fn run_patch_json<I, S>(args: I) -> Value
+fn run_drail_json<I, S>(args: I) -> Value
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    let output = run_patch(args);
+    let output = run_drail(args);
     assert_success(&output);
     serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
         panic!(
@@ -67,12 +67,12 @@ where
     })
 }
 
-fn run_patch_json_from<I, S>(args: I, cwd: &Path) -> Value
+fn run_drail_json_from<I, S>(args: I, cwd: &Path) -> Value
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    let output = run_patch_from(args, cwd);
+    let output = run_drail_from(args, cwd);
     assert_success(&output);
     serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
         panic!(
@@ -109,7 +109,7 @@ fn impact(value: &Value) -> &[Value] {
 
 #[test]
 fn symbol_callers_returns_callers_in_stable_order() {
-    let value = run_patch_json([
+    let value = run_drail_json([
         "symbol",
         "callers",
         "render",
@@ -173,7 +173,7 @@ fn symbol_callers_returns_callers_in_stable_order() {
 
 #[test]
 fn symbol_callers_preserves_second_hop_results_in_typed_output() {
-    let value = run_patch_json([
+    let value = run_drail_json([
         "symbol",
         "callers",
         "render",
@@ -209,7 +209,7 @@ fn symbol_callers_preserves_second_hop_results_in_typed_output() {
 
 #[test]
 fn symbol_callers_reports_warning_for_symbols_without_meaningful_callers_relation() {
-    let value = run_patch_json([
+    let value = run_drail_json([
         "symbol",
         "callers",
         "SymbolCommand",
@@ -247,20 +247,20 @@ fn symbol_callers_reports_warning_for_symbols_without_meaningful_callers_relatio
                 && item["confidence"] == "high"
                 && item["command"]
                     .as_str()
-                    .is_some_and(|command| command.contains("patch symbol find"))
+                    .is_some_and(|command| command.contains("drail symbol find"))
         }),
         "expected follow-up next suggestion for non-meaningful callers relation: {value:#}"
     );
 }
 
 #[test]
-fn symbol_callers_excludes_patchignored_call_sites() {
-    let value = run_patch_json([
+fn symbol_callers_excludes_drailignored_call_sites() {
+    let value = run_drail_json([
         "symbol",
         "callers",
         "visible_api",
         "--scope",
-        PATCHIGNORE_SCOPE,
+        DRAILIGNORE_SCOPE,
         "--json",
     ]);
     let callers = callers(&value);
@@ -289,8 +289,8 @@ fn symbol_callers_excludes_patchignored_call_sites() {
 
 #[test]
 fn symbol_callers_scope_dot_uses_invoking_cwd() {
-    let fixture_dir = fixture_dir_from_repo("tests/fixtures/patchignore");
-    let value = run_patch_json_from(
+    let fixture_dir = fixture_dir_from_repo("tests/fixtures/drailignore");
+    let value = run_drail_json_from(
         ["symbol", "callers", "visible_api", "--scope", ".", "--json"],
         &fixture_dir,
     );

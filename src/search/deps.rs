@@ -6,7 +6,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::cache::OutlineCache;
-use crate::error::PatchError;
+use crate::error::DrailError;
 use crate::read::detect_file_type;
 use crate::read::imports::{is_external, is_import_line, resolve_related_files_with_content};
 use crate::read::outline::code::extract_import_source;
@@ -41,13 +41,13 @@ pub fn analyze_deps(
     scope: &Path,
     cache: &OutlineCache,
     bloom: &crate::index::bloom::BloomFilterCache,
-) -> Result<DepsResult, PatchError> {
-    let path = &path.canonicalize().map_err(|e| PatchError::IoError {
+) -> Result<DepsResult, DrailError> {
+    let path = &path.canonicalize().map_err(|e| DrailError::IoError {
         path: path.to_path_buf(),
         source: e,
     })?;
 
-    let content = fs::read_to_string(path).map_err(|e| PatchError::IoError {
+    let content = fs::read_to_string(path).map_err(|e| DrailError::IoError {
         path: path.clone(),
         source: e,
     })?;

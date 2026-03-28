@@ -1,22 +1,22 @@
 #!/bin/bash
 set -e
 
-VERSION=$(cargo metadata --format-version 1 | jq -r '.packages[] | select(.name=="patch") | .version')
+VERSION=$(cargo metadata --format-version 1 | jq -r '.packages[] | select(.name=="drail") | .version')
 DIST="dist"
 mkdir -p "$DIST"
 
-echo "Building patch v${VERSION}..."
+echo "Building drail v${VERSION}..."
 
 # macOS arm64 (native)
 echo "  → darwin-arm64 (native)"
 cargo build --release
-cp target/release/patch "${DIST}/patch-${VERSION}-darwin-arm64"
+cp target/release/drail "${DIST}/drail-${VERSION}-darwin-arm64"
 
 # macOS x86_64 (cross — requires: rustup target add x86_64-apple-darwin)
 if rustup target list --installed | grep -q x86_64-apple-darwin; then
     echo "  → darwin-x86_64 (cross)"
     cargo build --release --target x86_64-apple-darwin
-    cp target/x86_64-apple-darwin/release/patch "${DIST}/patch-${VERSION}-darwin-x86_64"
+    cp target/x86_64-apple-darwin/release/drail "${DIST}/drail-${VERSION}-darwin-x86_64"
 else
     echo "  ⚠ Skipping darwin-x86_64 (run: rustup target add x86_64-apple-darwin)"
 fi
@@ -25,7 +25,7 @@ fi
 if command -v cross &>/dev/null; then
     echo "  → linux-x86_64 (cross)"
     cross build --release --target x86_64-unknown-linux-gnu
-    cp target/x86_64-unknown-linux-gnu/release/patch "${DIST}/patch-${VERSION}-linux-x86_64"
+    cp target/x86_64-unknown-linux-gnu/release/drail "${DIST}/drail-${VERSION}-linux-x86_64"
 else
     echo "  ⚠ Skipping linux-x86_64 (run: cargo install cross)"
 fi
@@ -33,7 +33,7 @@ fi
 # Create tarballs
 echo "Creating tarballs..."
 cd "$DIST"
-for f in patch-${VERSION}-*; do
+for f in drail-${VERSION}-*; do
     [ -f "$f" ] && tar czf "${f}.tar.gz" "$f" && echo "  → ${f}.tar.gz"
 done
 

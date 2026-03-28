@@ -1,12 +1,12 @@
 use std::process;
 
-use pm_patch::cli;
+use drail::cli;
 
 fn main() {
     configure_thread_pools();
 
     if let Err(error) = cli::run() {
-        if matches!(error, pm_patch::error::PatchError::AlreadyReported { .. }) {
+        if matches!(error, drail::error::DrailError::AlreadyReported { .. }) {
             process::exit(error.exit_code());
         }
         eprintln!("{error}");
@@ -15,7 +15,7 @@ fn main() {
 }
 
 fn configure_thread_pools() {
-    let num_threads = std::env::var("PATCH_THREADS")
+    let num_threads = std::env::var("DRAIL_THREADS")
         .ok()
         .and_then(|v| v.parse::<usize>().ok())
         .unwrap_or_else(|| {

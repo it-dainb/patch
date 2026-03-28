@@ -10,7 +10,7 @@ use std::path::Path;
 use memmap2::Mmap;
 
 use crate::cache::OutlineCache;
-use crate::error::PatchError;
+use crate::error::DrailError;
 use crate::format;
 use crate::types::{estimate_tokens, FileType, Lang, ViewMode};
 
@@ -46,22 +46,22 @@ pub fn read_file(
     full: bool,
     cache: &OutlineCache,
     edit_mode: bool,
-) -> Result<String, PatchError> {
+) -> Result<String, DrailError> {
     let meta = match fs::metadata(path) {
         Ok(m) => m,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            return Err(PatchError::NotFound {
+            return Err(DrailError::NotFound {
                 path: path.to_path_buf(),
                 suggestion: suggest_similar(path),
             });
         }
         Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => {
-            return Err(PatchError::PermissionDenied {
+            return Err(DrailError::PermissionDenied {
                 path: path.to_path_buf(),
             });
         }
         Err(e) => {
-            return Err(PatchError::IoError {
+            return Err(DrailError::IoError {
                 path: path.to_path_buf(),
                 source: e,
             });
@@ -89,11 +89,11 @@ pub fn read_file(
     }
 
     // Binary detection
-    let file = fs::File::open(path).map_err(|e| PatchError::IoError {
+    let file = fs::File::open(path).map_err(|e| DrailError::IoError {
         path: path.to_path_buf(),
         source: e,
     })?;
-    let mmap = unsafe { Mmap::map(&file) }.map_err(|e| PatchError::IoError {
+    let mmap = unsafe { Mmap::map(&file) }.map_err(|e| DrailError::IoError {
         path: path.to_path_buf(),
         source: e,
     })?;
@@ -164,9 +164,9 @@ fn read_json(
     byte_len: u64,
     buf: &[u8],
     json_selector: Option<&JsonSelector>,
-) -> Result<String, PatchError> {
+) -> Result<String, DrailError> {
     let source = String::from_utf8_lossy(buf);
-    let parsed = json::parse_json(&source).map_err(|error| PatchError::ParseError {
+    let parsed = json::parse_json(&source).map_err(|error| DrailError::ParseError {
         path: path.to_path_buf(),
         reason: error.to_string(),
     })?;
@@ -176,14 +176,14 @@ fn read_json(
         JsonSelector::Full => parsed,
         JsonSelector::Key(key) => json::resolve_path(&parsed, &key)
             .cloned()
-            .map_err(|error| PatchError::ParseError {
+            .map_err(|error| DrailError::ParseError {
                 path: path.to_path_buf(),
                 reason: error.to_string(),
             })?,
         JsonSelector::Index { start, end } => {
             let range = format!("{start}:{end}");
             let window =
-                json::slice_array(&parsed, &range).map_err(|error| PatchError::ParseError {
+                json::slice_array(&parsed, &range).map_err(|error| DrailError::ParseError {
                     path: path.to_path_buf(),
                     reason: error.to_string(),
                 })?;
@@ -192,12 +192,12 @@ fn read_json(
         JsonSelector::KeyIndex { key, start, end } => {
             let range = format!("{start}:{end}");
             let resolved =
-                json::resolve_path(&parsed, &key).map_err(|error| PatchError::ParseError {
+                json::resolve_path(&parsed, &key).map_err(|error| DrailError::ParseError {
                     path: path.to_path_buf(),
                     reason: error.to_string(),
                 })?;
             let window =
-                json::slice_array(resolved, &range).map_err(|error| PatchError::ParseError {
+                json::slice_array(resolved, &range).map_err(|error| DrailError::ParseError {
                     path: path.to_path_buf(),
                     reason: error.to_string(),
                 })?;
@@ -205,7 +205,7 @@ fn read_json(
         }
     };
 
-    let toon = json::encode_to_toon(&selected).map_err(|error| PatchError::ParseError {
+    let toon = json::encode_to_toon(&selected).map_err(|error| DrailError::ParseError {
         path: path.to_path_buf(),
         reason: error.to_string(),
     })?;
@@ -319,21 +319,21 @@ fn read_lines(
     start: usize,
     end: usize,
     edit_mode: bool,
-) -> Result<String, PatchError> {
+) -> Result<String, DrailError> {
     let range = format!("{start}-{end}");
     read_section(path, &range, edit_mode)
 }
 
-fn read_heading(path: &Path, heading: &str, edit_mode: bool) -> Result<String, PatchError> {
+fn read_heading(path: &Path, heading: &str, edit_mode: bool) -> Result<String, DrailError> {
     read_section(path, heading, edit_mode)
 }
 
-fn read_section(path: &Path, range: &str, edit_mode: bool) -> Result<String, PatchError> {
-    let file = fs::File::open(path).map_err(|e| PatchError::IoError {
+fn read_section(path: &Path, range: &str, edit_mode: bool) -> Result<String, DrailError> {
+    let file = fs::File::open(path).map_err(|e| DrailError::IoError {
         path: path.to_path_buf(),
         source: e,
     })?;
-    let mmap = unsafe { Mmap::map(&file) }.map_err(|e| PatchError::IoError {
+    let mmap = unsafe { Mmap::map(&file) }.map_err(|e| DrailError::IoError {
         path: path.to_path_buf(),
         source: e,
     })?;
@@ -341,12 +341,12 @@ fn read_section(path: &Path, range: &str, edit_mode: bool) -> Result<String, Pat
 
     // Check if this is a heading-based address (markdown)
     let (start, end) = if range.starts_with('#') {
-        resolve_heading(buf, range).ok_or_else(|| PatchError::InvalidQuery {
+        resolve_heading(buf, range).ok_or_else(|| DrailError::InvalidQuery {
             query: range.to_string(),
             reason: "heading not found in file".into(),
         })?
     } else {
-        parse_range(range).ok_or_else(|| PatchError::InvalidQuery {
+        parse_range(range).ok_or_else(|| DrailError::InvalidQuery {
             query: range.to_string(),
             reason: "expected format: \"start-end\" (e.g. \"45-89\") or heading (e.g. \"## Architecture\")".into(),
         })?
@@ -363,7 +363,7 @@ fn read_section(path: &Path, range: &str, edit_mode: bool) -> Result<String, Pat
     let e = end.min(total);
 
     if s >= e {
-        return Err(PatchError::InvalidQuery {
+        return Err(DrailError::InvalidQuery {
             query: range.to_string(),
             reason: format!("range out of bounds (file has {total} lines)"),
         });
@@ -400,9 +400,9 @@ fn parse_range(s: &str) -> Option<(usize, usize)> {
 }
 
 /// List directory contents — treat as glob on dir/*.
-fn list_directory(path: &Path) -> Result<String, PatchError> {
+fn list_directory(path: &Path) -> Result<String, DrailError> {
     let mut entries: Vec<String> = Vec::new();
-    let read_dir = fs::read_dir(path).map_err(|e| PatchError::IoError {
+    let read_dir = fs::read_dir(path).map_err(|e| DrailError::IoError {
         path: path.to_path_buf(),
         source: e,
     })?;
@@ -463,12 +463,12 @@ pub fn detect_file_type(path: &Path) -> FileType {
     }
 }
 
-pub fn is_markdown_heading_line(path: &Path, line_number: usize) -> Result<bool, PatchError> {
+pub fn is_markdown_heading_line(path: &Path, line_number: usize) -> Result<bool, DrailError> {
     if !matches!(detect_file_type(path), FileType::Markdown) {
         return Ok(false);
     }
 
-    let buf = fs::read(path).map_err(|source| PatchError::IoError {
+    let buf = fs::read(path).map_err(|source| DrailError::IoError {
         path: path.to_path_buf(),
         source,
     })?;
@@ -479,12 +479,12 @@ pub fn is_markdown_heading_line(path: &Path, line_number: usize) -> Result<bool,
 pub fn markdown_heading_line_text(
     path: &Path,
     line_number: usize,
-) -> Result<Option<String>, PatchError> {
+) -> Result<Option<String>, DrailError> {
     if !matches!(detect_file_type(path), FileType::Markdown) {
         return Ok(None);
     }
 
-    let buf = fs::read(path).map_err(|source| PatchError::IoError {
+    let buf = fs::read(path).map_err(|source| DrailError::IoError {
         path: path.to_path_buf(),
         source,
     })?;

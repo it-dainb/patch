@@ -1,12 +1,12 @@
 use crate::cli::args::SymbolCallersArgs;
 use crate::engine::symbol;
-use crate::error::PatchError;
+use crate::error::DrailError;
 use crate::output::json::envelope::NextItem;
 use crate::output::CommandOutput;
 use crate::output::{json, text};
 use serde_json::{json, Map, Value};
 
-pub fn run(args: &SymbolCallersArgs) -> Result<CommandOutput, PatchError> {
+pub fn run(args: &SymbolCallersArgs) -> Result<CommandOutput, DrailError> {
     let result = symbol::run_callers(&args.query, &args.scope, args.budget)?;
     let next = next_for_symbol_callers(&result);
     let meta = meta_for_symbol_callers(&result);
@@ -32,7 +32,7 @@ fn next_for_symbol_callers(result: &symbol::SymbolCallersCommandResult) -> Vec<N
         return vec![crate::output::suggestion(
             "Inspect symbol definitions directly when callers are not meaningful",
             format!(
-                "patch symbol find {:?} --scope {}",
+                "drail symbol find {:?} --scope {}",
                 result.data.query, result.data.scope
             ),
         )];
@@ -42,7 +42,7 @@ fn next_for_symbol_callers(result: &symbol::SymbolCallersCommandResult) -> Vec<N
         return vec![crate::output::suggestion(
             "Fallback to symbol or text search when callers are unavailable",
             format!(
-                "patch symbol find {:?} --scope {}",
+                "drail symbol find {:?} --scope {}",
                 result.data.query, result.data.scope
             ),
         )];

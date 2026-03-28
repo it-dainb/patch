@@ -6,31 +6,31 @@ use std::process::Output;
 use assert_cmd::Command;
 use serde_json::Value;
 
-const PATCHIGNORE_SCOPE: &str = "tests/fixtures/patchignore";
+const DRAILIGNORE_SCOPE: &str = "tests/fixtures/drailignore";
 
-fn run_patch<I, S>(args: I) -> Output
+fn run_drail<I, S>(args: I) -> Output
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    Command::cargo_bin("patch")
-        .expect("patch binary should build for integration tests")
+    Command::cargo_bin("drail")
+        .expect("drail binary should build for integration tests")
         .args(args)
         .output()
-        .expect("patch should execute")
+        .expect("drail should execute")
 }
 
-fn run_patch_from<I, S>(args: I, cwd: &Path) -> Output
+fn run_drail_from<I, S>(args: I, cwd: &Path) -> Output
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    Command::cargo_bin("patch")
-        .expect("patch binary should build for integration tests")
+    Command::cargo_bin("drail")
+        .expect("drail binary should build for integration tests")
         .current_dir(cwd)
         .args(args)
         .output()
-        .expect("patch should execute")
+        .expect("drail should execute")
 }
 
 fn stdout(output: &Output) -> String {
@@ -61,12 +61,12 @@ fn assert_failure(output: &Output) {
     );
 }
 
-fn run_patch_json<I, S>(args: I) -> Value
+fn run_drail_json<I, S>(args: I) -> Value
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    let output = run_patch(args);
+    let output = run_drail(args);
     assert_success(&output);
     serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
         panic!(
@@ -77,12 +77,12 @@ where
     })
 }
 
-fn run_patch_json_from<I, S>(args: I, cwd: &Path) -> Value
+fn run_drail_json_from<I, S>(args: I, cwd: &Path) -> Value
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    let output = run_patch_from(args, cwd);
+    let output = run_drail_from(args, cwd);
     assert_success(&output);
     serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
         panic!(
@@ -93,12 +93,12 @@ where
     })
 }
 
-fn run_patch_json_failure<I, S>(args: I) -> Value
+fn run_drail_json_failure<I, S>(args: I) -> Value
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    let output = run_patch(args);
+    let output = run_drail(args);
     assert_failure(&output);
     serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
         panic!(
@@ -147,7 +147,7 @@ fn match_paths(value: &Value) -> Vec<&str> {
 
 #[test]
 fn search_text_returns_typed_matches() {
-    let value = run_patch_json([
+    let value = run_drail_json([
         "search",
         "text",
         "symbol callers",
@@ -194,7 +194,7 @@ fn search_text_returns_typed_matches() {
 
 #[test]
 fn search_regex_returns_typed_matches() {
-    let value = run_patch_json([
+    let value = run_drail_json([
         "search",
         "regex",
         "symbol\\s+callers",
@@ -237,7 +237,7 @@ fn search_regex_returns_typed_matches() {
 
 #[test]
 fn search_regex_invalid_pattern_returns_single_error_diagnostic() {
-    let value = run_patch_json_failure(["search", "regex", "(", "--scope", "src", "--json"]);
+    let value = run_drail_json_failure(["search", "regex", "(", "--scope", "src", "--json"]);
     let diagnostics = diagnostics(&value);
 
     assert_eq!(value["command"], "search.regex");
@@ -251,7 +251,7 @@ fn search_regex_invalid_pattern_returns_single_error_diagnostic() {
 
 #[test]
 fn search_text_treats_regex_like_input_as_literal_and_hints_about_regex_command() {
-    let value = run_patch_json([
+    let value = run_drail_json([
         "search",
         "text",
         "/symbol\\s+callers/",
@@ -289,21 +289,21 @@ fn search_text_treats_regex_like_input_as_literal_and_hints_about_regex_command(
 }
 
 #[test]
-fn search_text_respects_patchignore_and_not_gitignore() {
-    let ignored = run_patch_json([
+fn search_text_respects_drailignore_and_not_gitignore() {
+    let ignored = run_drail_json([
         "search",
         "text",
         "IGNORED_TEXT_MARKER",
         "--scope",
-        PATCHIGNORE_SCOPE,
+        DRAILIGNORE_SCOPE,
         "--json",
     ]);
-    let gitignored = run_patch_json([
+    let gitignored = run_drail_json([
         "search",
         "text",
         "GITONLY_KEEP_MARKER",
         "--scope",
-        PATCHIGNORE_SCOPE,
+        DRAILIGNORE_SCOPE,
         "--json",
     ]);
 
@@ -318,13 +318,13 @@ fn search_text_respects_patchignore_and_not_gitignore() {
 }
 
 #[test]
-fn search_regex_respects_patchignore() {
-    let value = run_patch_json([
+fn search_regex_respects_drailignore() {
+    let value = run_drail_json([
         "search",
         "regex",
         "IGNORED_[A-Z_]+_MARKER",
         "--scope",
-        PATCHIGNORE_SCOPE,
+        DRAILIGNORE_SCOPE,
         "--json",
     ]);
 
@@ -336,8 +336,8 @@ fn search_regex_respects_patchignore() {
 
 #[test]
 fn search_text_parent_relative_scope_uses_invoking_cwd() {
-    let fixture_nested_dir = fixture_dir_from_repo("tests/fixtures/patchignore/nested");
-    let value = run_patch_json_from(
+    let fixture_nested_dir = fixture_dir_from_repo("tests/fixtures/drailignore/nested");
+    let value = run_drail_json_from(
         [
             "search",
             "text",

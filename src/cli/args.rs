@@ -4,7 +4,7 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 
 #[derive(Debug, Parser)]
 #[command(
-    name = "patch",
+    name = "drail",
     version,
     about = "Tree-sitter indexed lookups for AI agents"
 )]

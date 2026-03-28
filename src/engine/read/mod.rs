@@ -3,7 +3,7 @@ use std::path::Path;
 use serde::Serialize;
 
 use crate::cache::OutlineCache;
-use crate::error::PatchError;
+use crate::error::DrailError;
 use crate::output::json::envelope::Diagnostic;
 
 #[derive(Debug, Clone)]
@@ -73,7 +73,7 @@ pub fn run(
     selector: ReadSelector,
     full: bool,
     budget: Option<u64>,
-) -> Result<ReadCommandResult, PatchError> {
+) -> Result<ReadCommandResult, DrailError> {
     let content = read_content(path, &selector, full, budget)?;
 
     let selector = match selector {
@@ -102,7 +102,7 @@ fn read_content(
     selector: &ReadSelector,
     full: bool,
     budget: Option<u64>,
-) -> Result<String, PatchError> {
+) -> Result<String, DrailError> {
     if matches!(
         selector,
         ReadSelector::Key { .. } | ReadSelector::Index { .. } | ReadSelector::KeyIndex { .. }
@@ -115,7 +115,7 @@ fn read_content(
             }
             _ => unreachable!(),
         };
-        return Err(PatchError::InvalidQuery {
+        return Err(DrailError::InvalidQuery {
             query: query.into(),
             reason: reason.into(),
         });
@@ -131,7 +131,7 @@ fn read_content(
         ReadSelector::Heading(heading) => {
             let file_type = crate::read::detect_file_type(path);
             if !matches!(file_type, crate::types::FileType::Markdown) {
-                return Err(PatchError::InvalidQuery {
+                return Err(DrailError::InvalidQuery {
                     query: heading.clone(),
                     reason: "heading selectors are only supported for markdown files".into(),
                 });

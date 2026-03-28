@@ -18,7 +18,7 @@ fn unique_temp_dir(label: &str) -> PathBuf {
         .expect("clock should be after unix epoch")
         .as_nanos();
     env::temp_dir().join(format!(
-        "patch-installer-test-{label}-{}-{nanos}",
+        "drail-installer-test-{label}-{}-{nanos}",
         std::process::id()
     ))
 }
@@ -52,7 +52,7 @@ fn run_install(home: &Path, path_env: &str, dry_run: bool, extra_env: &[(&str, &
     command.env("HOME", home);
     command.env("PATH", path_env);
     if dry_run {
-        command.env("PATCH_INSTALL_DRY_RUN", "1");
+        command.env("DRAIL_INSTALL_DRY_RUN", "1");
     }
 
     for (key, value) in extra_env {
@@ -97,7 +97,7 @@ fn dry_run_defaults_to_home_local_bin_and_prints_path_guidance_when_missing() {
     let text = stdout(&output);
 
     assert_success(&output);
-    assert!(text.contains(&format!("{}/.local/bin/patch", home.display())));
+    assert!(text.contains(&format!("{}/.local/bin/drail", home.display())));
     assert!(
         text.contains("Add this directory to your PATH"),
         "stdout:\n{text}"
@@ -128,12 +128,12 @@ fn dry_run_honors_install_dir_override_and_omits_path_guidance_when_already_pres
         &home,
         &path_env,
         true,
-        &[("PATCH_INSTALL_DIR", install_dir_value.as_str())],
+        &[("DRAIL_INSTALL_DIR", install_dir_value.as_str())],
     );
     let text = stdout(&output);
 
     assert_success(&output);
-    assert!(text.contains(&format!("{}/patch", install_dir.display())));
+    assert!(text.contains(&format!("{}/drail", install_dir.display())));
     assert_not_contains(&text, "Add this directory to your PATH");
     assert_not_contains(&text, "MCP");
 }
@@ -143,7 +143,7 @@ fn dry_run_is_side_effect_free_even_when_target_exists() {
     let temp = TempDir::new("existing-target");
     let home = temp.path().join("home");
     let install_dir = home.join(".local/bin");
-    let target = install_dir.join("patch");
+    let target = install_dir.join("drail");
     fs::create_dir_all(&install_dir).expect("install dir should exist");
     fs::write(&target, "old").expect("existing target should be created");
 
@@ -151,7 +151,7 @@ fn dry_run_is_side_effect_free_even_when_target_exists() {
     let text = stdout(&output);
 
     assert_success(&output);
-    assert!(text.contains(&format!("{}/.local/bin/patch", home.display())));
+    assert!(text.contains(&format!("{}/.local/bin/drail", home.display())));
     assert_eq!(
         fs::read_to_string(&target).expect("target should remain readable"),
         "old"
@@ -163,9 +163,9 @@ fn rerunning_replaces_existing_target_idempotently() {
     let temp = TempDir::new("replace-target");
     let home = temp.path().join("home");
     let install_dir = home.join(".local/bin");
-    let source_one = temp.path().join("patch-one");
-    let source_two = temp.path().join("patch-two");
-    let target = install_dir.join("patch");
+    let source_one = temp.path().join("drail-one");
+    let source_two = temp.path().join("drail-two");
+    let target = install_dir.join("drail");
 
     fs::create_dir_all(&home).expect("home should exist");
     fs::write(&source_one, "first-binary").expect("first source should exist");
@@ -176,7 +176,7 @@ fn rerunning_replaces_existing_target_idempotently() {
         &home,
         "/usr/bin",
         false,
-        &[("PATCH_INSTALL_SOURCE", source_one_value.as_str())],
+        &[("DRAIL_INSTALL_SOURCE", source_one_value.as_str())],
     );
     assert_success(&first);
     assert_eq!(
@@ -189,7 +189,7 @@ fn rerunning_replaces_existing_target_idempotently() {
         &home,
         "/usr/bin",
         false,
-        &[("PATCH_INSTALL_SOURCE", source_two_value.as_str())],
+        &[("DRAIL_INSTALL_SOURCE", source_two_value.as_str())],
     );
     assert_success(&second);
     assert_eq!(

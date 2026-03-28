@@ -2,10 +2,10 @@ use std::io::IsTerminal;
 
 use crate::cli::args::{Cli, Command, SearchCommand, SymbolCommand};
 use crate::commands;
-use crate::error::PatchError;
+use crate::error::DrailError;
 use crate::output;
 
-pub fn run(cli: &Cli) -> Result<(), PatchError> {
+pub fn run(cli: &Cli) -> Result<(), DrailError> {
     let rendered = match cli.command {
         Command::Read(ref args) => commands::read::run(args)?,
         Command::Symbol(SymbolCommand::Find(ref args)) => commands::symbol::find::run(args)?,

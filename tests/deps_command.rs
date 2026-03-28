@@ -6,31 +6,31 @@ use std::process::Output;
 use assert_cmd::Command;
 use serde_json::Value;
 
-const PATCHIGNORE_SCOPE: &str = "tests/fixtures/patchignore";
+const DRAILIGNORE_SCOPE: &str = "tests/fixtures/drailignore";
 
-fn run_patch<I, S>(args: I) -> Output
+fn run_drail<I, S>(args: I) -> Output
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    Command::cargo_bin("patch")
-        .expect("patch binary should build for integration tests")
+    Command::cargo_bin("drail")
+        .expect("drail binary should build for integration tests")
         .args(args)
         .output()
-        .expect("patch should execute")
+        .expect("drail should execute")
 }
 
-fn run_patch_from<I, S>(args: I, cwd: &Path) -> Output
+fn run_drail_from<I, S>(args: I, cwd: &Path) -> Output
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    Command::cargo_bin("patch")
-        .expect("patch binary should build for integration tests")
+    Command::cargo_bin("drail")
+        .expect("drail binary should build for integration tests")
         .current_dir(cwd)
         .args(args)
         .output()
-        .expect("patch should execute")
+        .expect("drail should execute")
 }
 
 fn stdout(output: &Output) -> String {
@@ -61,12 +61,12 @@ fn assert_failure(output: &Output) {
     );
 }
 
-fn run_patch_json<I, S>(args: I) -> Value
+fn run_drail_json<I, S>(args: I) -> Value
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    let output = run_patch(args);
+    let output = run_drail(args);
     assert_success(&output);
     serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
         panic!(
@@ -77,12 +77,12 @@ where
     })
 }
 
-fn run_patch_json_from<I, S>(args: I, cwd: &Path) -> Value
+fn run_drail_json_from<I, S>(args: I, cwd: &Path) -> Value
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    let output = run_patch_from(args, cwd);
+    let output = run_drail_from(args, cwd);
     assert_success(&output);
     serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
         panic!(
@@ -93,12 +93,12 @@ where
     })
 }
 
-fn run_patch_json_failure<I, S>(args: I) -> Value
+fn run_drail_json_failure<I, S>(args: I) -> Value
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    let output = run_patch(args);
+    let output = run_drail(args);
     assert_failure(&output);
     serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
         panic!(
@@ -155,7 +155,7 @@ fn used_by(value: &Value) -> &[Value] {
 
 #[test]
 fn deps_returns_typed_reverse_dependency_data() {
-    let value = run_patch_json(["deps", "src/commands/deps.rs", "--scope", "src", "--json"]);
+    let value = run_drail_json(["deps", "src/commands/deps.rs", "--scope", "src", "--json"]);
 
     assert_eq!(value["command"], "deps");
     assert_eq!(value["schema_version"], 2);
@@ -257,7 +257,7 @@ fn deps_returns_typed_reverse_dependency_data() {
 
 #[test]
 fn deps_reverse_dependencies_use_stable_path_ordering() {
-    let value = run_patch_json(["deps", "src/commands/deps.rs", "--scope", "src", "--json"]);
+    let value = run_drail_json(["deps", "src/commands/deps.rs", "--scope", "src", "--json"]);
     let dependents = used_by(&value);
 
     let paths: Vec<&str> = dependents
@@ -282,7 +282,7 @@ fn deps_reverse_dependencies_use_stable_path_ordering() {
 
 #[test]
 fn deps_rejects_symbol_like_input_without_path_interpretation() {
-    let value = run_patch_json_failure(["deps", "render", "--scope", "src", "--json"]);
+    let value = run_drail_json_failure(["deps", "render", "--scope", "src", "--json"]);
 
     assert_eq!(value["command"], "deps");
     assert_eq!(value["schema_version"], 2);
@@ -314,7 +314,7 @@ fn deps_rejects_symbol_like_input_without_path_interpretation() {
 
 #[test]
 fn deps_text_output_includes_structured_sections() {
-    let output = run_patch(["deps", "src/commands/deps.rs", "--scope", "src"]);
+    let output = run_drail(["deps", "src/commands/deps.rs", "--scope", "src"]);
     let text = stdout(&output);
 
     assert_success(&output);
@@ -334,7 +334,7 @@ fn deps_text_output_includes_structured_sections() {
 
 #[test]
 fn deps_external_dependencies_use_stable_ordering() {
-    let value = run_patch_json(["deps", "src/search/deps.rs", "--scope", "src", "--json"]);
+    let value = run_drail_json(["deps", "src/search/deps.rs", "--scope", "src", "--json"]);
     let externals = external_uses(&value);
 
     let modules: Vec<&str> = externals
@@ -358,12 +358,12 @@ fn deps_external_dependencies_use_stable_ordering() {
 }
 
 #[test]
-fn deps_accepts_explicit_patchignored_target_but_omits_ignored_dependents() {
-    let value = run_patch_json([
+fn deps_accepts_explicit_drailignored_target_but_omits_ignored_dependents() {
+    let value = run_drail_json([
         "deps",
-        "tests/fixtures/patchignore/ignored-dir/ignored_api.rs",
+        "tests/fixtures/drailignore/ignored-dir/ignored_api.rs",
         "--scope",
-        PATCHIGNORE_SCOPE,
+        DRAILIGNORE_SCOPE,
         "--json",
     ]);
 
@@ -381,7 +381,7 @@ fn deps_accepts_explicit_patchignored_target_but_omits_ignored_dependents() {
 
     assert!(
         value["data"]["path"] == "ignored-dir/ignored_api.rs"
-            || value["data"]["path"] == "tests/fixtures/patchignore/ignored-dir/ignored_api.rs",
+            || value["data"]["path"] == "tests/fixtures/drailignore/ignored-dir/ignored_api.rs",
         "expected explicit ignored target path to be accepted: {value:#}"
     );
     assert!(
@@ -396,8 +396,8 @@ fn deps_accepts_explicit_patchignored_target_but_omits_ignored_dependents() {
 
 #[test]
 fn deps_path_stays_cwd_relative_when_scope_is_dot() {
-    let fixture_dir = fixture_dir_from_repo("tests/fixtures/patchignore");
-    let value = run_patch_json_from(
+    let fixture_dir = fixture_dir_from_repo("tests/fixtures/drailignore");
+    let value = run_drail_json_from(
         ["deps", "visible_api.rs", "--scope", ".", "--json"],
         &fixture_dir,
     );

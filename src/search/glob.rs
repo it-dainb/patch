@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use globset::Glob;
 
-use crate::error::PatchError;
+use crate::error::DrailError;
 use crate::types::estimate_tokens;
 
 const MAX_FILES: usize = 20;
@@ -21,8 +21,8 @@ pub struct GlobResult {
 }
 
 /// Glob search using `ignore::WalkBuilder` (parallel, .gitignore-aware).
-pub fn search(pattern: &str, scope: &Path) -> Result<GlobResult, PatchError> {
-    let glob = Glob::new(pattern).map_err(|e| PatchError::InvalidQuery {
+pub fn search(pattern: &str, scope: &Path) -> Result<GlobResult, DrailError> {
+    let glob = Glob::new(pattern).map_err(|e| DrailError::InvalidQuery {
         query: pattern.to_string(),
         reason: e.to_string(),
     })?;

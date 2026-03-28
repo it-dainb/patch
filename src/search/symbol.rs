@@ -10,7 +10,7 @@ use super::treesitter::{
     extract_implemented_interfaces, DEFINITION_KINDS,
 };
 
-use crate::error::PatchError;
+use crate::error::DrailError;
 use crate::read::detect_file_type;
 use crate::read::outline::code::outline_language;
 use crate::search::rank;
@@ -31,10 +31,10 @@ pub fn search(
     query: &str,
     scope: &Path,
     context: Option<&Path>,
-) -> Result<SearchResult, PatchError> {
+) -> Result<SearchResult, DrailError> {
     // Compile regex once, share across both arms
     let word_pattern = format!(r"\b{}\b", regex_syntax::escape(query));
-    let matcher = RegexMatcher::new(&word_pattern).map_err(|e| PatchError::InvalidQuery {
+    let matcher = RegexMatcher::new(&word_pattern).map_err(|e| DrailError::InvalidQuery {
         query: query.to_string(),
         reason: e.to_string(),
     })?;
@@ -85,7 +85,7 @@ pub fn search(
 /// Single-read design: reads each file once, checks for symbol via
 /// `memchr::memmem` (SIMD), then reuses the buffer for tree-sitter parsing.
 /// Early termination: quits the parallel walker once enough defs are found.
-fn find_definitions(query: &str, scope: &Path) -> Result<Vec<Match>, PatchError> {
+fn find_definitions(query: &str, scope: &Path) -> Result<Vec<Match>, DrailError> {
     let matches: Mutex<Vec<Match>> = Mutex::new(Vec::new());
     // Relaxed is correct: walker.run() joins all threads before we read the final value.
     // Early-quit checks are approximate by design — one extra iteration is harmless.
@@ -359,7 +359,7 @@ fn find_usages(
     query: &str,
     matcher: &RegexMatcher,
     scope: &Path,
-) -> Result<Vec<Match>, PatchError> {
+) -> Result<Vec<Match>, DrailError> {
     let matches: Mutex<Vec<Match>> = Mutex::new(Vec::new());
     // Relaxed: same reasoning as find_definitions — approximate early-quit, joined before read
     let found_count = AtomicUsize::new(0);

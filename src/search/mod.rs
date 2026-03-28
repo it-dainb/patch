@@ -19,7 +19,7 @@ use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 use crate::cache::OutlineCache;
-use crate::error::PatchError;
+use crate::error::DrailError;
 use crate::format;
 use crate::read;
 use crate::types::{estimate_tokens, FileType, Match, SearchResult};
@@ -112,12 +112,12 @@ pub(crate) fn walk_builder(scope: &Path) -> ::ignore::WalkBuilder {
 pub(crate) fn project_entry_filter(
     scope: &Path,
 ) -> impl Fn(&::ignore::DirEntry) -> bool + Send + Sync + 'static {
-    let patchignore = self::ignore::PatchignoreMatcher::from_scope(scope);
+    let drailignore = self::ignore::DrailignoreMatcher::from_scope(scope);
 
     move |entry: &::ignore::DirEntry| {
         let is_dir = entry.file_type().is_some_and(|ft| ft.is_dir());
 
-        if patchignore.is_ignored(entry.path(), is_dir) {
+        if drailignore.is_ignored(entry.path(), is_dir) {
             return false;
         }
 
@@ -131,7 +131,7 @@ pub(crate) fn project_entry_filter(
 }
 
 pub(crate) fn walker(scope: &Path) -> ::ignore::WalkParallel {
-    let threads = std::env::var("PATCH_THREADS")
+    let threads = std::env::var("DRAIL_THREADS")
         .ok()
         .and_then(|v| v.parse::<usize>().ok())
         .unwrap_or_else(|| {
@@ -163,7 +163,7 @@ pub fn search_symbol(
     query: &str,
     scope: &Path,
     cache: &OutlineCache,
-) -> Result<String, PatchError> {
+) -> Result<String, DrailError> {
     let result = symbol::search(query, scope, None)?;
     let bloom = crate::index::bloom::BloomFilterCache::new();
     format_search_result(&result, cache, &bloom, 0)
@@ -173,7 +173,7 @@ pub fn search_content(
     query: &str,
     scope: &Path,
     cache: &OutlineCache,
-) -> Result<String, PatchError> {
+) -> Result<String, DrailError> {
     let result = content::search(query, scope, false, None)?;
     let bloom = crate::index::bloom::BloomFilterCache::new();
     format_search_result(&result, cache, &bloom, 0)
@@ -183,23 +183,23 @@ pub fn search_regex(
     pattern: &str,
     scope: &Path,
     cache: &OutlineCache,
-) -> Result<String, PatchError> {
+) -> Result<String, DrailError> {
     let result = content::search(pattern, scope, true, None)?;
     let bloom = crate::index::bloom::BloomFilterCache::new();
     format_search_result(&result, cache, &bloom, 0)
 }
 
 /// Raw symbol search — returns structured result for programmatic inspection.
-pub fn search_symbol_raw(query: &str, scope: &Path) -> Result<SearchResult, PatchError> {
+pub fn search_symbol_raw(query: &str, scope: &Path) -> Result<SearchResult, DrailError> {
     symbol::search(query, scope, None)
 }
 
 /// Raw content search — returns structured result for programmatic inspection.
-pub fn search_content_raw(query: &str, scope: &Path) -> Result<SearchResult, PatchError> {
+pub fn search_content_raw(query: &str, scope: &Path) -> Result<SearchResult, DrailError> {
     content::search(query, scope, false, None)
 }
 
-pub fn search_regex_raw(pattern: &str, scope: &Path) -> Result<SearchResult, PatchError> {
+pub fn search_regex_raw(pattern: &str, scope: &Path) -> Result<SearchResult, DrailError> {
     content::search(pattern, scope, true, None)
 }
 
@@ -207,7 +207,7 @@ pub fn search_glob(
     pattern: &str,
     scope: &Path,
     _cache: &OutlineCache,
-) -> Result<String, PatchError> {
+) -> Result<String, DrailError> {
     let result = glob::search(pattern, scope)?;
     format_glob_result(&result, scope)
 }
@@ -540,7 +540,7 @@ fn format_search_result(
     cache: &OutlineCache,
     bloom: &crate::index::bloom::BloomFilterCache,
     expand: usize,
-) -> Result<String, PatchError> {
+) -> Result<String, DrailError> {
     let header = format::search_header(
         &result.query,
         &result.scope,
@@ -868,7 +868,7 @@ fn extract_line_range(line: &str) -> Option<(u32, u32)> {
 }
 
 /// Format glob search results (file list with previews).
-fn format_glob_result(result: &glob::GlobResult, scope: &Path) -> Result<String, PatchError> {
+fn format_glob_result(result: &glob::GlobResult, scope: &Path) -> Result<String, DrailError> {
     let header = format!(
         "# Glob: \"{}\" in {} — {} files",
         result.pattern,

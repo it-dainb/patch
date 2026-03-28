@@ -14,7 +14,7 @@ fn unique_temp_dir(label: &str) -> PathBuf {
         .expect("clock should be after unix epoch")
         .as_nanos();
     env::temp_dir().join(format!(
-        "patch-version-sync-test-{label}-{}-{nanos}",
+        "drail-version-sync-test-{label}-{}-{nanos}",
         std::process::id()
     ))
 }
@@ -48,7 +48,7 @@ fn write_fixture(root: &Path, cargo_version: &str, npm_version: &str) {
     fs::write(
         root.join("Cargo.toml"),
         format!(
-            "[package]\nname = \"pm-patch\"\nversion = \"{}\"\nedition = \"2021\"\n",
+            "[package]\nname = \"drail\"\nversion = \"{}\"\nedition = \"2021\"\n",
             cargo_version
         ),
     )
@@ -59,7 +59,7 @@ fn write_fixture(root: &Path, cargo_version: &str, npm_version: &str) {
         format!(
             concat!(
                 "{{\n",
-                "  \"name\": \"@it.dainb/pm-patch\",\n",
+                "  \"name\": \"drail\",\n",
                 "  \"version\": \"{}\"\n",
                 "}}\n"
             ),

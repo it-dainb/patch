@@ -1,13 +1,13 @@
 use crate::cli::args::ReadArgs;
 use crate::engine::read::{self, ReadSelector};
-use crate::error::PatchError;
+use crate::error::DrailError;
 use crate::output::json::envelope::NextItem;
 use crate::output::CommandOutput;
 use crate::output::{json, text};
 use crate::types::FileType;
 use serde_json::{json, Map, Value};
 
-pub fn run(args: &ReadArgs) -> Result<CommandOutput, PatchError> {
+pub fn run(args: &ReadArgs) -> Result<CommandOutput, DrailError> {
     let selector = parse_selector(args)?;
     let result = read::run(&args.path, selector, args.full, args.budget)?;
     let mut output = CommandOutput::with_parts(
@@ -46,7 +46,7 @@ fn next_for_read(
             vec![crate::output::suggestion(
                 format!("Read the full markdown section starting at line {start} with --heading"),
                 format!(
-                    "patch read {:?} --heading {:?}",
+                    "drail read {:?} --heading {:?}",
                     path.display().to_string(),
                     heading_line
                 ),
@@ -56,7 +56,7 @@ fn next_for_read(
     }
 }
 
-fn parse_selector(args: &ReadArgs) -> Result<ReadSelector, PatchError> {
+fn parse_selector(args: &ReadArgs) -> Result<ReadSelector, DrailError> {
     match (&args.lines, &args.heading, &args.key, &args.index) {
         (Some(lines), None, None, None) => {
             let (start, end) = parse_lines(lines)?;
@@ -77,23 +77,23 @@ fn parse_selector(args: &ReadArgs) -> Result<ReadSelector, PatchError> {
             Ok(ReadSelector::Index { start, end })
         }
         (None, None, None, None) => Ok(ReadSelector::Full),
-        _ => Err(PatchError::InvalidQuery {
+        _ => Err(DrailError::InvalidQuery {
             query: "read".into(),
             reason: "invalid selector combination".into(),
         }),
     }
 }
 
-fn parse_index(index: &str) -> Result<(usize, usize), PatchError> {
+fn parse_index(index: &str) -> Result<(usize, usize), DrailError> {
     let (start, end) = index
         .split_once(':')
-        .ok_or_else(|| PatchError::InvalidQuery {
+        .ok_or_else(|| DrailError::InvalidQuery {
             query: index.into(),
             reason: "expected index range in START:END format".into(),
         })?;
 
     if start.trim().is_empty() || end.trim().is_empty() || end.contains(':') {
-        return Err(PatchError::InvalidQuery {
+        return Err(DrailError::InvalidQuery {
             query: index.into(),
             reason: "expected index range in START:END format".into(),
         });
@@ -102,14 +102,14 @@ fn parse_index(index: &str) -> Result<(usize, usize), PatchError> {
     let start = start
         .trim()
         .parse::<usize>()
-        .map_err(|_| PatchError::InvalidQuery {
+        .map_err(|_| DrailError::InvalidQuery {
             query: index.into(),
             reason: "expected index range in START:END format".into(),
         })?;
     let end = end
         .trim()
         .parse::<usize>()
-        .map_err(|_| PatchError::InvalidQuery {
+        .map_err(|_| DrailError::InvalidQuery {
             query: index.into(),
             reason: "expected index range in START:END format".into(),
         })?;
@@ -117,10 +117,10 @@ fn parse_index(index: &str) -> Result<(usize, usize), PatchError> {
     Ok((start, end))
 }
 
-fn parse_lines(lines: &str) -> Result<(usize, usize), PatchError> {
+fn parse_lines(lines: &str) -> Result<(usize, usize), DrailError> {
     let (start, end) = lines
         .split_once(':')
-        .ok_or_else(|| PatchError::InvalidQuery {
+        .ok_or_else(|| DrailError::InvalidQuery {
             query: lines.into(),
             reason: "expected line range in START:END format".into(),
         })?;
@@ -128,20 +128,20 @@ fn parse_lines(lines: &str) -> Result<(usize, usize), PatchError> {
     let start = start
         .trim()
         .parse::<usize>()
-        .map_err(|_| PatchError::InvalidQuery {
+        .map_err(|_| DrailError::InvalidQuery {
             query: lines.into(),
             reason: "expected line range in START:END format".into(),
         })?;
     let end = end
         .trim()
         .parse::<usize>()
-        .map_err(|_| PatchError::InvalidQuery {
+        .map_err(|_| DrailError::InvalidQuery {
             query: lines.into(),
             reason: "expected line range in START:END format".into(),
         })?;
 
     if start == 0 || end < start {
-        return Err(PatchError::InvalidQuery {
+        return Err(DrailError::InvalidQuery {
             query: lines.into(),
             reason: "line range must start at 1 and end at or after the start line".into(),
         });
@@ -153,7 +153,7 @@ fn parse_lines(lines: &str) -> Result<(usize, usize), PatchError> {
 fn meta_for_read(
     path: &std::path::Path,
     selector: &read::ReadSelectorData,
-) -> Result<Map<String, Value>, PatchError> {
+) -> Result<Map<String, Value>, DrailError> {
     let mut meta = Map::new();
     let (selector_kind, selector_display, first_line) = match selector {
         read::ReadSelectorData::Full => ("full", "full".to_string(), 1),

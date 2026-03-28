@@ -35,7 +35,7 @@ mod tests {
     #[test]
     fn resolve_scope_from_existing_relative_path_canonicalizes_against_base_cwd() {
         let base_cwd = Path::new(env!("CARGO_MANIFEST_DIR"));
-        let scope = Path::new("tests/fixtures/patchignore");
+        let scope = Path::new("tests/fixtures/drailignore");
 
         let resolved = resolve_scope_from(base_cwd, scope);
         let expected = base_cwd.join(scope).canonicalize().unwrap();
@@ -47,7 +47,7 @@ mod tests {
     fn resolve_scope_from_absolute_existing_path_canonicalizes() {
         let base_cwd = Path::new(env!("CARGO_MANIFEST_DIR"));
         let scope = base_cwd
-            .join("tests/fixtures/patchignore")
+            .join("tests/fixtures/drailignore")
             .canonicalize()
             .unwrap();
 
@@ -61,7 +61,7 @@ mod tests {
     fn resolve_scope_from_missing_relative_path_preserves_raw_input() {
         let base_cwd = Path::new(env!("CARGO_MANIFEST_DIR"));
         let scope = PathBuf::from(
-            "tests/fixtures/patchignore/__missing_relative_scope_for_resolve_scope_from_test",
+            "tests/fixtures/drailignore/__missing_relative_scope_for_resolve_scope_from_test",
         );
 
         assert!(!base_cwd.join(&scope).exists());

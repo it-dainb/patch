@@ -210,6 +210,43 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6184e33543162437515c2e2b48714794e37845ec9851711914eec9d308f6ebe8"
 
 [[package]]
+name = "drail"
+version = "0.0.4"
+dependencies = [
+ "assert_cmd",
+ "clap",
+ "clap_complete",
+ "dashmap",
+ "globset",
+ "grep-regex",
+ "grep-searcher",
+ "ignore",
+ "memchr",
+ "memmap2",
+ "rayon",
+ "regex-syntax",
+ "serde",
+ "serde_json",
+ "streaming-iterator",
+ "toml",
+ "toon-format",
+ "tree-sitter",
+ "tree-sitter-c",
+ "tree-sitter-c-sharp",
+ "tree-sitter-cpp",
+ "tree-sitter-go",
+ "tree-sitter-java",
+ "tree-sitter-javascript",
+ "tree-sitter-php",
+ "tree-sitter-python",
+ "tree-sitter-ruby",
+ "tree-sitter-rust",
+ "tree-sitter-scala",
+ "tree-sitter-swift",
+ "tree-sitter-typescript",
+]
+
+[[package]]
 name = "either"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -410,43 +447,6 @@ dependencies = [
  "redox_syscall",
  "smallvec",
  "windows-link",
-]
-
-[[package]]
-name = "pm-patch"
-version = "0.0.3"
-dependencies = [
- "assert_cmd",
- "clap",
- "clap_complete",
- "dashmap",
- "globset",
- "grep-regex",
- "grep-searcher",
- "ignore",
- "memchr",
- "memmap2",
- "rayon",
- "regex-syntax",
- "serde",
- "serde_json",
- "streaming-iterator",
- "toml",
- "toon-format",
- "tree-sitter",
- "tree-sitter-c",
- "tree-sitter-c-sharp",
- "tree-sitter-cpp",
- "tree-sitter-go",
- "tree-sitter-java",
- "tree-sitter-javascript",
- "tree-sitter-php",
- "tree-sitter-python",
- "tree-sitter-ruby",
- "tree-sitter-rust",
- "tree-sitter-scala",
- "tree-sitter-swift",
- "tree-sitter-typescript",
 ]
 
 [[package]]

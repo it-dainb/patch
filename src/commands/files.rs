@@ -1,12 +1,12 @@
 use crate::cli::args::FilesArgs;
 use crate::engine::files;
-use crate::error::PatchError;
+use crate::error::DrailError;
 use crate::output::json::envelope::NextItem;
 use crate::output::CommandOutput;
 use crate::output::{json, text};
 use serde_json::{json, Map, Value};
 
-pub fn run(args: &FilesArgs) -> Result<CommandOutput, PatchError> {
+pub fn run(args: &FilesArgs) -> Result<CommandOutput, DrailError> {
     let result = files::run(&args.pattern, &args.scope, args.budget)?;
     let next = next_for_files(&result);
     let diagnostics = diagnostics_without_suggestions(&result.diagnostics);
@@ -49,7 +49,7 @@ fn next_for_files(result: &files::FilesCommandResult) -> Vec<NextItem> {
         .or_else(|| {
             infer_available_extension(&result.data.scope).map(|extension| {
                 format!(
-                    "patch files \"*.{extension}\" --scope {}",
+                    "drail files \"*.{extension}\" --scope {}",
                     result.data.scope
                 )
             })
