@@ -17,6 +17,18 @@ The supported top-level commands are:
 
 There is no query-shorthand mode, no MCP runtime, and no editor/host install flow.
 
+## Read selectors and flags
+
+`read` supports these selectors:
+
+- `--full`
+- `--lines <start:end>`
+- `--heading <heading>`
+- `--key <PATH>`
+- `--index <START:END>`
+
+`--key` and `--index` are JSON-only selectors. Non-JSON targets with either selector return a parse error diagnostic.
+
 ## Scope ignore contract
 
 When a command accepts `--scope <dir>`, patch may read one `.patchignore` file from that active scope root. only one .patchignore at the scope root is read.
@@ -151,6 +163,36 @@ Each command stores its structured payload under `data`.
 - `files`: `files`
 - `deps`: `uses_local`, `uses_external`, `used_by`
 - `map`: `entries`, `total_files`
+
+### `read` selector contract
+
+For `read`, `data.meta` and `data.selector` expose a stable selector contract.
+
+- `selector_kind`: `full`, `lines`, `heading`, `key`, `index`, `key_index`
+- `selector_display` uses raw selector text:
+  - key: raw path (example: `users.0.accounts`)
+  - index: raw range (example: `0:1`)
+  - key+index: `<path> @ <range>` (example: `users.0.accounts @ 0:1`)
+
+`data.selector` retains enum-tagged serialization variants:
+
+- `{"Lines": {"start": 7, "end": 17}}`
+- `{"Heading": {"value": "## Command families"}}`
+- `{"Key": {"value": "users.0.accounts"}}`
+- `{"Index": {"start": 0, "end": 1}}`
+- `{"KeyIndex": {"value": "users.0.accounts", "start": 0, "end": 1}}`
+
+JSON `read` content is TOON text. `file_kind` remains `structured_data` for JSON reads.
+
+Stable JSON read error substrings callers can rely on:
+
+- `invalid JSON`
+- `missing key segment`
+- `expected numeric array index`
+- `expected index range in START:END format`
+- `index range end must be greater than or equal to start`
+- `index range starts at`
+- `failed to encode JSON as TOON`
 
 Traversal-derived command payloads exclude paths filtered by the active scope root `.patchignore`. That filtering affects discovered matches, callers, reverse dependencies, and map entries, but does not change the command names, shared flags, JSON envelope keys, or text section ordering.
 
