@@ -57,20 +57,6 @@ fn next_for_read(
 }
 
 fn parse_selector(args: &ReadArgs) -> Result<ReadSelector, PatchError> {
-    if args.key.is_some() && !is_json_path(&args.path) {
-        return Err(PatchError::InvalidQuery {
-            query: "--key".into(),
-            reason: "--key is only supported for JSON files".into(),
-        });
-    }
-
-    if args.index.is_some() && !is_json_path(&args.path) {
-        return Err(PatchError::InvalidQuery {
-            query: "--index".into(),
-            reason: "--index is only supported for JSON files".into(),
-        });
-    }
-
     match (&args.lines, &args.heading, &args.key, &args.index) {
         (Some(lines), None, None, None) => {
             let (start, end) = parse_lines(lines)?;
@@ -96,12 +82,6 @@ fn parse_selector(args: &ReadArgs) -> Result<ReadSelector, PatchError> {
             reason: "invalid selector combination".into(),
         }),
     }
-}
-
-fn is_json_path(path: &std::path::Path) -> bool {
-    path.extension()
-        .and_then(|extension| extension.to_str())
-        .is_some_and(|extension| extension.eq_ignore_ascii_case("json"))
 }
 
 fn parse_index(index: &str) -> Result<(usize, usize), PatchError> {

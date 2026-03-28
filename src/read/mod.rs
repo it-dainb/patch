@@ -1,7 +1,6 @@
 pub mod binary;
 pub mod generated;
 pub mod imports;
-#[allow(dead_code)]
 pub mod json;
 pub mod outline;
 
@@ -18,10 +17,32 @@ use crate::types::{estimate_tokens, FileType, Lang, ViewMode};
 pub(crate) const TOKEN_THRESHOLD: u64 = 6_000;
 const FILE_SIZE_CAP: u64 = 500_000; // 500KB
 
+#[derive(Debug, Clone)]
+pub enum SectionSelector {
+    Lines { start: usize, end: usize },
+    Heading(String),
+}
+
+#[derive(Debug, Clone)]
+pub enum JsonSelector {
+    Full,
+    Key(String),
+    Index {
+        start: usize,
+        end: usize,
+    },
+    KeyIndex {
+        key: String,
+        start: usize,
+        end: usize,
+    },
+}
+
 /// Main entry point for read mode. Routes through the decision tree.
 pub fn read_file(
     path: &Path,
-    section: Option<&str>,
+    section: Option<&SectionSelector>,
+    json_selector: Option<&JsonSelector>,
     full: bool,
     cache: &OutlineCache,
     edit_mode: bool,
@@ -59,9 +80,12 @@ pub fn read_file(
         return Ok(format::file_header(path, 0, 0, ViewMode::Empty));
     }
 
-    // Section param → return those lines verbatim, any size
-    if let Some(range) = section {
-        return read_section(path, range, edit_mode);
+    // Section selector → return those lines/heading verbatim, any size
+    if let Some(selector) = section {
+        return match selector {
+            SectionSelector::Lines { start, end } => read_lines(path, *start, *end, edit_mode),
+            SectionSelector::Heading(heading) => read_heading(path, heading, edit_mode),
+        };
     }
 
     // Binary detection
@@ -91,6 +115,10 @@ pub fn read_file(
             line_count,
             ViewMode::Generated,
         ));
+    }
+
+    if is_json_file(path) {
+        return read_json(path, byte_len, buf, json_selector);
     }
 
     let tokens = estimate_tokens(byte_len);
@@ -123,6 +151,68 @@ pub fn read_file(
     };
     let header = format::file_header(path, byte_len, line_count, mode);
     Ok(format!("{header}\n\n{outline}"))
+}
+
+fn is_json_file(path: &Path) -> bool {
+    path.extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("json"))
+}
+
+fn read_json(
+    path: &Path,
+    byte_len: u64,
+    buf: &[u8],
+    json_selector: Option<&JsonSelector>,
+) -> Result<String, PatchError> {
+    let source = String::from_utf8_lossy(buf);
+    let parsed = json::parse_json(&source).map_err(|error| PatchError::ParseError {
+        path: path.to_path_buf(),
+        reason: error.to_string(),
+    })?;
+
+    let selector = json_selector.cloned().unwrap_or(JsonSelector::Full);
+    let selected = match selector {
+        JsonSelector::Full => parsed,
+        JsonSelector::Key(key) => json::resolve_path(&parsed, &key)
+            .cloned()
+            .map_err(|error| PatchError::ParseError {
+                path: path.to_path_buf(),
+                reason: error.to_string(),
+            })?,
+        JsonSelector::Index { start, end } => {
+            let range = format!("{start}:{end}");
+            let window =
+                json::slice_array(&parsed, &range).map_err(|error| PatchError::ParseError {
+                    path: path.to_path_buf(),
+                    reason: error.to_string(),
+                })?;
+            serde_json::Value::Array(window.to_vec())
+        }
+        JsonSelector::KeyIndex { key, start, end } => {
+            let range = format!("{start}:{end}");
+            let resolved =
+                json::resolve_path(&parsed, &key).map_err(|error| PatchError::ParseError {
+                    path: path.to_path_buf(),
+                    reason: error.to_string(),
+                })?;
+            let window =
+                json::slice_array(resolved, &range).map_err(|error| PatchError::ParseError {
+                    path: path.to_path_buf(),
+                    reason: error.to_string(),
+                })?;
+            serde_json::Value::Array(window.to_vec())
+        }
+    };
+
+    let toon = json::encode_to_toon(&selected).map_err(|error| PatchError::ParseError {
+        path: path.to_path_buf(),
+        reason: error.to_string(),
+    })?;
+
+    let line_count = memchr::memchr_iter(b'\n', buf).count() as u32 + 1;
+    let header = format::file_header(path, byte_len, line_count, ViewMode::Toon);
+    Ok(format!("{header}\n\n{toon}"))
 }
 
 /// Resolve a heading address to a line range in a markdown file.
@@ -224,6 +314,20 @@ fn resolve_heading(buf: &[u8], heading: &str) -> Option<(usize, usize)> {
 /// Read a specific line range from a file.
 /// Uses memchr to find the Nth newline offset and slice the mmap buffer directly
 /// instead of collecting all lines into a Vec.
+fn read_lines(
+    path: &Path,
+    start: usize,
+    end: usize,
+    edit_mode: bool,
+) -> Result<String, PatchError> {
+    let range = format!("{start}-{end}");
+    read_section(path, &range, edit_mode)
+}
+
+fn read_heading(path: &Path, heading: &str, edit_mode: bool) -> Result<String, PatchError> {
+    read_section(path, heading, edit_mode)
+}
+
 fn read_section(path: &Path, range: &str, edit_mode: bool) -> Result<String, PatchError> {
     let file = fs::File::open(path).map_err(|e| PatchError::IoError {
         path: path.to_path_buf(),
