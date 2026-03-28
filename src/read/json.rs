@@ -1,6 +1,7 @@
 use std::fmt;
 
 use serde_json::Value;
+use toon_format::{encode, EncodeOptions};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum JsonReadError {
@@ -39,23 +40,79 @@ impl fmt::Display for JsonReadError {
 impl std::error::Error for JsonReadError {}
 
 pub(crate) fn parse_json(input: &str) -> Result<Value, JsonReadError> {
-    let _ = input;
-    todo!()
+    serde_json::from_str(input).map_err(|err| JsonReadError::InvalidJson(err.to_string()))
 }
 
 pub(crate) fn resolve_path<'a>(value: &'a Value, path: &str) -> Result<&'a Value, JsonReadError> {
-    let _ = (value, path);
-    todo!()
+    if path.is_empty() {
+        return Ok(value);
+    }
+
+    let mut current = value;
+    for segment in path.split('.') {
+        if segment.is_empty() {
+            return Err(JsonReadError::MissingKeySegment(segment.to_string()));
+        }
+
+        match current {
+            Value::Object(map) => {
+                current = map
+                    .get(segment)
+                    .ok_or_else(|| JsonReadError::MissingKeySegment(segment.to_string()))?;
+            }
+            Value::Array(items) => {
+                let index = segment
+                    .parse::<usize>()
+                    .map_err(|_| JsonReadError::ExpectedNumericArrayIndex(segment.to_string()))?;
+                current = items
+                    .get(index)
+                    .ok_or_else(|| JsonReadError::MissingKeySegment(segment.to_string()))?;
+            }
+            _ => return Err(JsonReadError::MissingKeySegment(segment.to_string())),
+        }
+    }
+
+    Ok(current)
 }
 
 pub(crate) fn slice_array<'a>(value: &'a Value, range: &str) -> Result<&'a [Value], JsonReadError> {
-    let _ = (value, range);
-    todo!()
+    let items = value
+        .as_array()
+        .ok_or_else(|| JsonReadError::MissingKeySegment(range.to_string()))?;
+
+    let (start_raw, end_raw) = range
+        .split_once(':')
+        .ok_or(JsonReadError::InvalidIndexRangeSyntax)?;
+
+    if start_raw.is_empty() || end_raw.is_empty() || end_raw.contains(':') {
+        return Err(JsonReadError::InvalidIndexRangeSyntax);
+    }
+
+    let start = start_raw
+        .parse::<usize>()
+        .map_err(|_| JsonReadError::InvalidIndexRangeSyntax)?;
+    let end = end_raw
+        .parse::<usize>()
+        .map_err(|_| JsonReadError::InvalidIndexRangeSyntax)?;
+
+    if end < start {
+        return Err(JsonReadError::DescendingIndexRange { start, end });
+    }
+
+    let len = items.len();
+    if start > len {
+        return Err(JsonReadError::IndexRangeStartsAt { start, len });
+    }
+    if end > len {
+        return Err(JsonReadError::IndexRangeStartsAt { start: end, len });
+    }
+
+    Ok(&items[start..end])
 }
 
 pub(crate) fn encode_to_toon(value: &Value) -> Result<String, JsonReadError> {
-    let _ = value;
-    todo!()
+    let options = EncodeOptions::new().with_key_folding(toon_format::types::KeyFoldingMode::Safe);
+    encode(value, &options).map_err(|err| JsonReadError::ToonEncodeFailed(err.to_string()))
 }
 
 #[cfg(test)]
@@ -144,9 +201,15 @@ mod tests {
 
     #[test]
     fn encode_to_toon_emits_compact_output() {
-        let root = sample_root();
-        let subtree = resolve_path(&root, "users.0.accounts").unwrap();
-        let rendered = encode_to_toon(subtree).unwrap();
+        let value = serde_json::json!({
+            "root": {
+                "branch": {
+                    "leaf": "value"
+                }
+            }
+        });
+        let rendered = encode_to_toon(&value).unwrap();
         assert!(!rendered.trim().is_empty());
+        assert!(rendered.contains("root.branch.leaf:"));
     }
 }
