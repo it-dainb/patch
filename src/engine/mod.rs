@@ -7,11 +7,13 @@ pub mod read;
 pub mod search;
 pub mod symbol;
 
+#[must_use]
 pub fn resolve_scope(scope: &Path) -> PathBuf {
     let base_cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     resolve_scope_from(&base_cwd, scope)
 }
 
+#[must_use]
 pub fn resolve_scope_from(base_cwd: &Path, scope: &Path) -> PathBuf {
     let candidate = if scope.is_relative() {
         base_cwd.join(scope)
