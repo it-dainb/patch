@@ -1,6 +1,7 @@
 pub mod binary;
 pub mod generated;
 pub mod imports;
+#[allow(dead_code)]
 pub mod json;
 pub mod outline;
 
