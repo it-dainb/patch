@@ -12,6 +12,7 @@ use memmap2::Mmap;
 use crate::cache::OutlineCache;
 use crate::error::DrailError;
 use crate::format;
+use crate::minified;
 use crate::types::{estimate_tokens, FileType, Lang, ViewMode};
 
 pub(crate) const TOKEN_THRESHOLD: u64 = 6_000;
@@ -38,6 +39,12 @@ pub enum JsonSelector {
     },
 }
 
+#[derive(Debug, Clone)]
+pub struct ReadOutput {
+    pub content: String,
+    pub minified_fallback_used: bool,
+}
+
 /// Main entry point for read mode. Routes through the decision tree.
 pub fn read_file(
     path: &Path,
@@ -46,7 +53,7 @@ pub fn read_file(
     full: bool,
     cache: &OutlineCache,
     edit_mode: bool,
-) -> Result<String, DrailError> {
+) -> Result<ReadOutput, DrailError> {
     let meta = match fs::metadata(path) {
         Ok(m) => m,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
@@ -70,14 +77,20 @@ pub fn read_file(
 
     // Directory → list contents
     if meta.is_dir() {
-        return list_directory(path);
+        return list_directory(path).map(|content| ReadOutput {
+            content,
+            minified_fallback_used: false,
+        });
     }
 
     let byte_len = meta.len();
 
     // Empty check before mmap — mmap on 0-byte file may fail on some platforms
     if byte_len == 0 {
-        return Ok(format::file_header(path, 0, 0, ViewMode::Empty));
+        return Ok(ReadOutput {
+            content: format::file_header(path, 0, 0, ViewMode::Empty),
+            minified_fallback_used: false,
+        });
     }
 
     // Section selector → return those lines/heading verbatim, any size
@@ -85,7 +98,11 @@ pub fn read_file(
         return match selector {
             SectionSelector::Lines { start, end } => read_lines(path, *start, *end, edit_mode),
             SectionSelector::Heading(heading) => read_heading(path, heading, edit_mode),
-        };
+        }
+        .map(|content| ReadOutput {
+            content,
+            minified_fallback_used: false,
+        });
     }
 
     // Binary detection
@@ -101,7 +118,10 @@ pub fn read_file(
 
     if binary::is_binary(buf) {
         let mime = mime_from_ext(path);
-        return Ok(format::binary_header(path, byte_len, mime));
+        return Ok(ReadOutput {
+            content: format::binary_header(path, byte_len, mime),
+            minified_fallback_used: false,
+        });
     }
 
     let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
@@ -109,30 +129,62 @@ pub fn read_file(
     // Generated
     if generated::is_generated_by_name(name) || generated::is_generated_by_content(buf) {
         let line_count = memchr::memchr_iter(b'\n', buf).count() as u32 + 1;
-        return Ok(format::file_header(
-            path,
-            byte_len,
-            line_count,
-            ViewMode::Generated,
-        ));
+        return Ok(ReadOutput {
+            content: format::file_header(path, byte_len, line_count, ViewMode::Generated),
+            minified_fallback_used: false,
+        });
     }
 
     if is_json_file(path) {
-        return read_json(path, byte_len, buf, json_selector);
+        return read_json(path, byte_len, buf, json_selector).map(|content| ReadOutput {
+            content,
+            minified_fallback_used: false,
+        });
     }
 
     let tokens = estimate_tokens(byte_len);
     let content = String::from_utf8_lossy(buf);
     let line_count = memchr::memchr_iter(b'\n', buf).count() as u32 + 1;
+    let minified_profile = minified::profile(&content);
 
     // Full mode or small file → return full content (skip smart view)
-    if full || tokens <= TOKEN_THRESHOLD {
+    if full {
         let header = format::file_header(path, byte_len, line_count, ViewMode::Full);
         if edit_mode {
             let numbered = format::hashlines(&content, 1);
-            return Ok(format!("{header}\n\n{numbered}"));
+            return Ok(ReadOutput {
+                content: format!("{header}\n\n{numbered}"),
+                minified_fallback_used: false,
+            });
         }
-        return Ok(format!("{header}\n\n{content}"));
+        return Ok(ReadOutput {
+            content: format!("{header}\n\n{content}"),
+            minified_fallback_used: false,
+        });
+    }
+
+    if minified_profile.is_likely_minified() {
+        let preview = outline::fallback::minified_preview(&content);
+        let header = format::file_header(path, byte_len, line_count, ViewMode::Full);
+        return Ok(ReadOutput {
+            content: format!("{header}\n\n{preview}"),
+            minified_fallback_used: true,
+        });
+    }
+
+    if tokens <= TOKEN_THRESHOLD {
+        let header = format::file_header(path, byte_len, line_count, ViewMode::Full);
+        if edit_mode {
+            let numbered = format::hashlines(&content, 1);
+            return Ok(ReadOutput {
+                content: format!("{header}\n\n{numbered}"),
+                minified_fallback_used: false,
+            });
+        }
+        return Ok(ReadOutput {
+            content: format!("{header}\n\n{content}"),
+            minified_fallback_used: false,
+        });
     }
 
     // Large file → smart view by file type
@@ -150,7 +202,10 @@ pub fn read_file(
         _ => ViewMode::Outline,
     };
     let header = format::file_header(path, byte_len, line_count, mode);
-    Ok(format!("{header}\n\n{outline}"))
+    Ok(ReadOutput {
+        content: format!("{header}\n\n{outline}"),
+        minified_fallback_used: false,
+    })
 }
 
 fn is_json_file(path: &Path) -> bool {

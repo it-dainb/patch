@@ -4,7 +4,7 @@ use serde::Serialize;
 
 use crate::cache::OutlineCache;
 use crate::error::DrailError;
-use crate::output::json::envelope::Diagnostic;
+use crate::output::json::envelope::{Diagnostic, DiagnosticLevel};
 
 #[derive(Debug, Clone)]
 pub enum ReadSelector {
@@ -74,7 +74,7 @@ pub fn run(
     full: bool,
     budget: Option<u64>,
 ) -> Result<ReadCommandResult, DrailError> {
-    let content = read_content(path, &selector, full, budget)?;
+    let (content, minified_fallback_used) = read_content(path, &selector, full, budget)?;
 
     let selector = match selector {
         ReadSelector::Full => ReadSelectorData::Full,
@@ -87,13 +87,24 @@ pub fn run(
         }
     };
 
+    let mut diagnostics = Vec::new();
+    if minified_fallback_used {
+        diagnostics.push(Diagnostic {
+            level: DiagnosticLevel::Warning,
+            code: "minified_fallback_used".into(),
+            message: "content appears minified; showing a bounded preview instead of raw content"
+                .into(),
+            suggestion: None,
+        });
+    }
+
     Ok(ReadCommandResult {
         data: ReadResultData {
             path: path.display().to_string(),
             selector,
             content,
         },
-        diagnostics: Vec::new(),
+        diagnostics,
     })
 }
 
@@ -102,7 +113,7 @@ fn read_content(
     selector: &ReadSelector,
     full: bool,
     budget: Option<u64>,
-) -> Result<String, DrailError> {
+) -> Result<(String, bool), DrailError> {
     if matches!(
         selector,
         ReadSelector::Key { .. } | ReadSelector::Index { .. } | ReadSelector::KeyIndex { .. }
@@ -156,7 +167,7 @@ fn read_content(
         _ => None,
     };
 
-    let content = crate::read::read_file(
+    let output = crate::read::read_file(
         path,
         section_selector.as_ref(),
         json_selector.as_ref(),
@@ -165,10 +176,12 @@ fn read_content(
         false,
     )?;
 
-    Ok(match budget {
-        Some(budget) => crate::budget::apply(&content, budget),
-        None => content,
-    })
+    let content = match budget {
+        Some(budget) => crate::budget::apply(&output.content, budget),
+        None => output.content,
+    };
+
+    Ok((content, output.minified_fallback_used))
 }
 
 fn is_json_file(path: &Path) -> bool {

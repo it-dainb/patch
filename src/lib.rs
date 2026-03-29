@@ -23,6 +23,7 @@ pub mod error;
 pub(crate) mod format;
 pub mod index;
 pub mod map;
+pub(crate) mod minified;
 pub mod output;
 pub(crate) mod read;
 #[allow(dead_code)]
