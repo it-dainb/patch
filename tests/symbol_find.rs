@@ -427,7 +427,7 @@ fn symbol_find_minified_fallback_returns_usage_only_snippets() {
     );
 
     for entry in matches {
-        let snippet = entry["text"].as_str().unwrap_or_else(|| {
+        let snippet = entry["snippet"].as_str().unwrap_or_else(|| {
             panic!(
                 "expected fallback snippet text string, got:\n{}",
                 serde_json::to_string_pretty(entry).expect("json value should serialize")
@@ -482,7 +482,7 @@ fn symbol_find_oversized_minified_bundle_uses_text_fallback() {
     );
 
     for entry in matches {
-        let snippet = entry["text"].as_str().unwrap_or_else(|| {
+        let snippet = entry["snippet"].as_str().unwrap_or_else(|| {
             panic!(
                 "expected fallback snippet text string, got:\n{}",
                 serde_json::to_string_pretty(entry).expect("json value should serialize")

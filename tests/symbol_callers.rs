@@ -402,6 +402,23 @@ fn symbol_callers_minified_fallback_returns_placeholder_caller_and_empty_impact(
     );
 
     for caller in callers {
+        let mut keys: Vec<&str> = caller
+            .as_object()
+            .unwrap_or_else(|| {
+                panic!(
+                    "expected caller entry object, got:\n{}",
+                    serde_json::to_string_pretty(caller).expect("json value should serialize")
+                )
+            })
+            .keys()
+            .map(String::as_str)
+            .collect();
+        keys.sort_unstable();
+        assert_eq!(
+            keys,
+            vec!["call_text", "caller", "line", "path"],
+            "expected fallback caller rows to contain existing fields only: {caller:#}"
+        );
         assert!(
             caller["path"].is_string() && caller["line"].is_u64(),
             "expected fallback caller to keep existing structured fields: {caller:#}"
@@ -464,6 +481,19 @@ fn symbol_callers_oversized_minified_bundle_uses_text_fallback() {
     );
 
     for caller in callers {
+        let mut keys: Vec<&str> = caller
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(|k| k.as_str())
+            .collect();
+        keys.sort_unstable();
+        assert_eq!(keys, vec!["call_text", "caller", "line", "path"]);
+
+        assert!(
+            caller["path"].is_string() && caller["line"].is_u64(),
+            "expected fallback caller to keep existing structured fields: {caller:#}"
+        );
         assert_eq!(caller["caller"], "<text-fallback>");
         let call_text = caller["call_text"].as_str().unwrap_or_else(|| {
             panic!(
