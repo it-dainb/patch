@@ -65,6 +65,12 @@ fn evidence_block(text: &str) -> &str {
         .unwrap_or_else(|| panic!("expected output with Evidence and Next sections:\n{text}"))
 }
 
+fn diagnostics_block(text: &str) -> &str {
+    text.split("## Diagnostics\n")
+        .nth(1)
+        .unwrap_or_else(|| panic!("expected output with Diagnostics section:\n{text}"))
+}
+
 fn assert_toon_success_baseline(text: &str) {
     assert_contains(text, "# read");
     let evidence = evidence_block(text);
@@ -279,6 +285,104 @@ fn read_json_full_flag_still_renders_toon() {
     assert_toon_success_baseline(&text);
     assert_contains(&text, "users[");
     assert_contains(&text, "meta:");
+}
+
+#[test]
+fn read_minified_code_uses_preview_fallback_and_warning() {
+    let output = run_drail(["read", "tests/fixtures/minified/app.min.js"]);
+    let text = stdout(&output);
+    let fixture = include_str!("fixtures/minified/app.min.js").trim_end();
+
+    assert_success(&output);
+
+    let evidence = evidence_block(&text);
+    assert_contains(evidence, "stableEntryPoint");
+    assert!(
+        evidence.lines().count() > 3,
+        "expected multi-line preview evidence, got:\n{evidence}"
+    );
+    assert_not_contains(evidence, fixture);
+
+    let diagnostics = diagnostics_block(&text);
+    assert_contains(diagnostics, "warning:");
+    assert_contains(diagnostics, "minified_fallback_used");
+}
+
+#[test]
+fn read_minified_code_json_keeps_contract_and_warns() {
+    let value = run_drail_json(["read", "tests/fixtures/minified/app.min.js", "--json"]);
+    let fixture = include_str!("fixtures/minified/app.min.js").trim_end();
+
+    assert_eq!(value["schema_version"], 2);
+    assert_eq!(value["ok"], true);
+
+    let object = value.as_object().unwrap_or_else(|| {
+        panic!(
+            "expected top-level object, got:\n{}",
+            serde_json::to_string_pretty(&value).expect("json value should serialize")
+        )
+    });
+    let keys = object
+        .keys()
+        .map(String::as_str)
+        .collect::<std::collections::BTreeSet<_>>();
+    let expected = [
+        "command",
+        "schema_version",
+        "ok",
+        "data",
+        "next",
+        "diagnostics",
+    ]
+    .into_iter()
+    .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(keys, expected, "unexpected envelope keys: {value:#}");
+
+    assert_eq!(value["data"]["meta"]["selector_kind"], "full");
+
+    let diagnostics = value["diagnostics"].as_array().unwrap_or_else(|| {
+        panic!(
+            "expected diagnostics array, got:\n{}",
+            serde_json::to_string_pretty(&value).expect("json value should serialize")
+        )
+    });
+    let fallback_warnings = diagnostics
+        .iter()
+        .filter(|item| item["level"] == "warning" && item["code"] == "minified_fallback_used")
+        .count();
+    assert_eq!(
+        fallback_warnings, 1,
+        "expected one fallback warning: {value:#}"
+    );
+
+    let content = value["data"]["content"].as_str().unwrap_or_else(|| {
+        panic!(
+            "expected data.content string, got:\n{}",
+            serde_json::to_string_pretty(&value).expect("json value should serialize")
+        )
+    });
+    assert_ne!(
+        content, fixture,
+        "expected fallback preview content: {value:#}"
+    );
+}
+
+#[test]
+fn read_full_keeps_raw_minified_content_without_warning() {
+    let output = run_drail(["read", "tests/fixtures/minified/app.min.js", "--full"]);
+    let text = stdout(&output);
+    let fixture = include_str!("fixtures/minified/app.min.js").trim_end();
+
+    assert_success(&output);
+
+    let evidence = evidence_block(&text);
+    assert_contains(evidence, fixture);
+    assert_eq!(
+        evidence.lines().count(),
+        3,
+        "expected raw single-line full evidence without wrapping, got:\n{evidence}"
+    );
+    assert_not_contains(diagnostics_block(&text), "minified_fallback_used");
 }
 
 #[test]
