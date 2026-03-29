@@ -3,6 +3,7 @@ pub mod callers;
 pub mod content;
 pub mod deps;
 pub mod facets;
+pub mod fallback;
 pub mod glob;
 pub mod ignore;
 pub mod rank;

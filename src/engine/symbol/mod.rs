@@ -132,6 +132,15 @@ pub fn run(
             message: format!("no symbol matches found for \"{query}\""),
             suggestion: None,
         }]
+    } else if result.text_fallback_used {
+        vec![Diagnostic {
+            level: DiagnosticLevel::Warning,
+            code: "text_fallback_used".into(),
+            message:
+                "structural parsing was skipped or unreliable; returning best-effort text fallback"
+                    .into(),
+            suggestion: None,
+        }]
     } else {
         Vec::new()
     };
@@ -197,7 +206,7 @@ pub fn run_callers(
                 .collect(),
         },
         truncated: false,
-        diagnostics: callers_diagnostics(query, &scope)?,
+        diagnostics: callers_diagnostics(query, &scope, result.text_fallback_used)?,
     };
 
     if let Some(budget) = budget {
@@ -229,7 +238,22 @@ pub fn run_callers(
     Ok(command_result)
 }
 
-fn callers_diagnostics(query: &str, scope: &Path) -> Result<Vec<Diagnostic>, DrailError> {
+fn callers_diagnostics(
+    query: &str,
+    scope: &Path,
+    text_fallback_used: bool,
+) -> Result<Vec<Diagnostic>, DrailError> {
+    if text_fallback_used {
+        return Ok(vec![Diagnostic {
+            level: DiagnosticLevel::Warning,
+            code: "text_fallback_used".into(),
+            message:
+                "structural parsing was skipped or unreliable; returning best-effort text fallback"
+                    .into(),
+            suggestion: None,
+        }]);
+    }
+
     let symbol_result = crate::search::search_symbol_raw(query, scope)?;
     let definition_snippets = symbol_result
         .matches

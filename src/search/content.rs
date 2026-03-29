@@ -123,5 +123,6 @@ pub fn search(
         total_found: total,
         definitions: 0,
         usages: total,
+        text_fallback_used: false,
     })
 }
