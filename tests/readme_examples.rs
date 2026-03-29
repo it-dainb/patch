@@ -157,6 +157,23 @@ fn readme_and_cli_contract_document_v2_output_contract() {
         "cargo run -- files \"*.definitely-nope\" --scope src --json",
     );
     assert_contains(&readme, "cargo run -- search regex \"(\" --scope src");
+    assert_contains(&readme, "minified, oversized, or parse-unreliable");
+    assert_contains(
+        &readme,
+        "`read` returns a bounded preview instead of dumping unreadable raw content",
+    );
+    assert_contains(
+        &readme,
+        "This preview fallback is skipped when you explicitly ask for raw/targeted content via `--full` or an explicit selector (`--lines`, `--heading`, `--key`, or `--index`)",
+    );
+    assert_contains(
+        &readme,
+        "`symbol find` falls back to usage-only matches with snippet text",
+    );
+    assert_contains(
+        &readme,
+        "`symbol callers` returns best-effort text fallback rows, uses `\"<text-fallback>\"` for `caller`, leaves `impact` empty",
+    );
     assert_contains(&readme, ".drailignore");
     assert_contains(&readme, "active scope root");
     assert_contains(&readme, ".gitignore is not read");
@@ -193,6 +210,26 @@ fn readme_and_cli_contract_document_v2_output_contract() {
     );
     assert_contains(&contract, "`index range starts at`");
     assert_contains(&contract, "`failed to encode JSON as TOON`");
+    assert_contains(
+        &contract,
+        "minified, oversized, or structurally parse-unreliable",
+    );
+    assert_contains(
+        &contract,
+        "`read` may emit `minified_fallback_used` and return a bounded preview",
+    );
+    assert_contains(
+        &contract,
+        "`symbol.find` fallback rows stay `kind: \"usage\"`",
+    );
+    assert_contains(
+        &contract,
+        "`symbol.callers` fallback rows use `caller: \"<text-fallback>\"`",
+    );
+    assert_contains(
+        &contract,
+        "fallback-only `symbol.callers` responses keep `impact` as `[]`",
+    );
     assert_contains(&contract, "first selected line itself");
     assert_contains(&contract, ".drailignore");
     assert_contains(&contract, "only one .drailignore at the scope root is read");

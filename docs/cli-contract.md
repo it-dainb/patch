@@ -107,6 +107,8 @@ Diagnostics are shared across commands and use this shape:
 
 High-confidence follow-up actions belong in top-level `next`, not in `diagnostics`.
 
+Successful commands can include real warning diagnostics (for example `minified_fallback_used` on `read` and `text_fallback_used` on symbol fallback paths) while still returning the same V2 envelope and section ordering.
+
 Current behavior stays intentionally sparse:
 
 - invalid command inputs aim to produce exactly 1 error diagnostic
@@ -184,6 +186,8 @@ For `read`, `data.meta` and `data.selector` expose a stable selector contract.
 
 JSON `read` content is TOON text. `file_kind` remains `structured_data` for JSON reads.
 
+For non-JSON reads, minified-content fallback triggers when content is minified, oversized, or structurally parse-unreliable. In those cases, `read` may emit `minified_fallback_used` and return a bounded preview instead of unreadable raw output. This fallback is bypassed when the request is explicit via `--full` or selectors (`--lines`, `--heading`, `--key`, `--index`).
+
 Stable JSON read error substrings callers can rely on:
 
 - `invalid JSON`
@@ -195,6 +199,14 @@ Stable JSON read error substrings callers can rely on:
 - `failed to encode JSON as TOON`
 
 Traversal-derived command payloads exclude paths filtered by the active scope root `.drailignore`. That filtering affects discovered matches, callers, reverse dependencies, and map entries, but does not change the command names, shared flags, JSON envelope keys, or text section ordering.
+
+### Symbol fallback semantics
+
+When structural parsing is skipped or unreliable (including minified or oversized content), symbol commands degrade to text fallback and emit `text_fallback_used` warning diagnostics.
+
+- `symbol.find` fallback rows stay `kind: "usage"` and include best-effort snippets.
+- `symbol.callers` fallback rows use `caller: "<text-fallback>"` with existing caller fields unchanged.
+- fallback-only `symbol.callers` responses keep `impact` as `[]`.
 
 ### Markdown heading guidance rule for `read`
 

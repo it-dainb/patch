@@ -86,6 +86,8 @@ cargo run -- read tests/fixtures/json/users.json --key users.0.accounts --index 
 
 Use `read` when you already know the path and need exact content. Markdown `--lines` remains valid for arbitrary chunk reads; when the first selected line is itself a recognized heading, drail may also suggest a `--heading` follow-up to read the full section. JSON files always render as TOON text, including `--full` and selector reads. `--key` and `--index` are JSON-only selectors: `--key <PATH>` drills into a subtree using dot-separated object keys and numeric array segments, and `--index START:END` slices arrays with zero-based, end-exclusive bounds.
 
+When content is minified, oversized, or parse-unreliable, `read` returns a bounded preview instead of dumping unreadable raw content and emits a `minified_fallback_used` warning diagnostic. This preview fallback is skipped when you explicitly ask for raw/targeted content via `--full` or an explicit selector (`--lines`, `--heading`, `--key`, or `--index`).
+
 ### `symbol find`
 
 Find symbol definitions and usages with explicit kind filtering.
@@ -97,6 +99,8 @@ cargo run -- symbol find render --scope src/output --kind definition
 
 Use `symbol find` when the target is code structure, not just matching text.
 
+When structural parsing is skipped or unreliable (for example with minified or oversized input), `symbol find` falls back to usage-only matches with snippet text and emits `text_fallback_used`.
+
 ### `symbol callers`
 
 Find call sites plus second-hop impact.
@@ -106,6 +110,8 @@ cargo run -- symbol callers render --scope src/output
 ```
 
 Use `symbol callers` before changing a symbol that may affect downstream code.
+
+When structural parsing is skipped or unreliable, `symbol callers` returns best-effort text fallback rows, uses `"<text-fallback>"` for `caller`, leaves `impact` empty for fallback-only results, and emits `text_fallback_used`.
 
 ### `search text`
 

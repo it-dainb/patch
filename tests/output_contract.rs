@@ -370,6 +370,89 @@ fn json_no_placeholder_success_diagnostics() {
 }
 
 #[test]
+fn json_success_with_real_warnings_keeps_v2_envelope_shape() {
+    let read = run_drail_json(["read", "tests/fixtures/minified/app.min.js", "--json"]);
+    assert_v2_envelope(&read, "read");
+    assert_eq!(
+        read["ok"], true,
+        "expected successful read envelope: {read:#}"
+    );
+    assert!(
+        diagnostics(&read, "read")
+            .iter()
+            .any(|item| item["level"] == "warning" && item["code"] == "minified_fallback_used"),
+        "expected read fallback warning in successful envelope: {read:#}"
+    );
+
+    let find = run_drail_json([
+        "symbol",
+        "find",
+        "stableEntryPoint",
+        "--scope",
+        "tests/fixtures/minified",
+        "--json",
+    ]);
+    assert_v2_envelope(&find, "symbol.find");
+    assert_eq!(
+        find["ok"], true,
+        "expected successful symbol.find envelope: {find:#}"
+    );
+    assert!(
+        diagnostics(&find, "symbol.find")
+            .iter()
+            .any(|item| item["level"] == "warning" && item["code"] == "text_fallback_used"),
+        "expected symbol.find fallback warning in successful envelope: {find:#}"
+    );
+
+    let callers = run_drail_json([
+        "symbol",
+        "callers",
+        "stableEntryPoint",
+        "--scope",
+        "tests/fixtures/minified",
+        "--json",
+    ]);
+    assert_v2_envelope(&callers, "symbol.callers");
+    assert_eq!(
+        callers["ok"], true,
+        "expected successful symbol.callers envelope: {callers:#}"
+    );
+    assert!(
+        diagnostics(&callers, "symbol.callers")
+            .iter()
+            .any(|item| item["level"] == "warning" && item["code"] == "text_fallback_used"),
+        "expected symbol.callers fallback warning in successful envelope: {callers:#}"
+    );
+}
+
+#[test]
+fn text_output_with_real_warnings_keeps_v2_section_order() {
+    let cases = [
+        vec!["read", "tests/fixtures/minified/app.min.js"],
+        vec![
+            "symbol",
+            "find",
+            "stableEntryPoint",
+            "--scope",
+            "tests/fixtures/minified",
+        ],
+        vec![
+            "symbol",
+            "callers",
+            "stableEntryPoint",
+            "--scope",
+            "tests/fixtures/minified",
+        ],
+    ];
+
+    for args in cases {
+        let output = run_drail(args);
+        assert_success(&output);
+        assert_text_section_order_v2(&stdout(&output));
+    }
+}
+
+#[test]
 fn text_output_renders_none_for_empty_next_and_diagnostics() {
     let output = run_drail(["map", "--scope", "src"]);
 

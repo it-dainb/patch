@@ -727,7 +727,13 @@ mod tests {
         let bloom = BloomFilterCache::new();
         let scope = Path::new("tests/fixtures/drailignore");
 
-        let callers = find_callers("visible_api", scope, &bloom).expect("caller search succeeds");
+        let (callers, text_fallback_used) =
+            find_callers("visible_api", scope, &bloom).expect("caller search succeeds");
+
+        assert!(
+            !text_fallback_used,
+            "did not expect text fallback for simple rust fixture"
+        );
 
         assert!(
             callers
