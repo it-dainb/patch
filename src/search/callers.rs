@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use streaming_iterator::StreamingIterator;
@@ -11,6 +11,7 @@ use super::treesitter::{extract_definition_name, DEFINITION_KINDS};
 
 use crate::cache::OutlineCache;
 use crate::error::DrailError;
+use crate::minified;
 use crate::read::detect_file_type;
 use crate::read::outline::code::outline_language;
 use crate::types::FileType;
@@ -60,6 +61,7 @@ pub struct ImpactResult {
 pub struct CallerSearchResult {
     pub callers: Vec<CallerResult>,
     pub impact: Vec<ImpactResult>,
+    pub text_fallback_used: bool,
 }
 
 /// Find all call sites of a target symbol across the codebase using tree-sitter.
@@ -67,9 +69,10 @@ pub fn find_callers(
     target: &str,
     scope: &Path,
     bloom: &crate::index::bloom::BloomFilterCache,
-) -> Result<Vec<CallerMatch>, DrailError> {
+) -> Result<(Vec<CallerMatch>, bool), DrailError> {
     let matches: Mutex<Vec<CallerMatch>> = Mutex::new(Vec::new());
     let found_count = AtomicUsize::new(0);
+    let text_fallback_used = AtomicBool::new(false);
     let needle = target.as_bytes();
 
     let walker = super::walker(scope);
@@ -77,6 +80,7 @@ pub fn find_callers(
     walker.run(|| {
         let matches = &matches;
         let found_count = &found_count;
+        let text_fallback_used = &text_fallback_used;
 
         Box::new(move |entry| {
             // Early termination: enough callers found
@@ -94,17 +98,14 @@ pub fn find_callers(
 
             let path = entry.path();
 
-            // Single metadata call: check size and capture mtime together
-            let (file_len, mtime) = match std::fs::metadata(path) {
+            // Single metadata call: capture mtime
+            let (_file_len, mtime) = match std::fs::metadata(path) {
                 Ok(meta) => (
                     meta.len(),
                     meta.modified().unwrap_or(std::time::SystemTime::UNIX_EPOCH),
                 ),
                 Err(_) => return ignore::WalkState::Continue,
             };
-            if file_len > 500_000 {
-                return ignore::WalkState::Continue;
-            }
 
             // Single read: read file once, use buffer for both check and parse
             let Ok(content) = fs::read_to_string(path) else {
@@ -123,6 +124,38 @@ pub fn find_callers(
 
             // Only process files with tree-sitter grammars
             let file_type = detect_file_type(path);
+            let lang = match file_type {
+                FileType::Code(lang) => Some(lang),
+                _ => None,
+            };
+
+            if super::fallback::should_use_text_fallback(content.len() as u64, &content, lang) {
+                let shared_content: Arc<String> = Arc::new(content);
+                let file_callers =
+                    super::fallback::query_centered_matches(shared_content.as_ref(), target)
+                        .into_iter()
+                        .map(|(line, call_text)| CallerMatch {
+                            path: path.to_path_buf(),
+                            line,
+                            calling_function: "<text-fallback>".to_string(),
+                            call_text,
+                            caller_range: None,
+                            content: Arc::clone(&shared_content),
+                        })
+                        .collect::<Vec<_>>();
+
+                if !file_callers.is_empty() {
+                    text_fallback_used.store(true, Ordering::Relaxed);
+                    found_count.fetch_add(file_callers.len(), Ordering::Relaxed);
+                    let mut all = matches
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner);
+                    all.extend(file_callers);
+                }
+
+                return ignore::WalkState::Continue;
+            }
+
             let FileType::Code(lang) = file_type else {
                 return ignore::WalkState::Continue;
             };
@@ -145,9 +178,10 @@ pub fn find_callers(
         })
     });
 
-    Ok(matches
+    let all = matches
         .into_inner()
-        .unwrap_or_else(std::sync::PoisonError::into_inner))
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    Ok((all, text_fallback_used.load(Ordering::Relaxed)))
 }
 
 /// Tree-sitter call site detection.
@@ -281,7 +315,7 @@ pub(crate) fn find_callers_batch(
                 ),
                 Err(_) => return ignore::WalkState::Continue,
             };
-            if file_len > 500_000 {
+            if file_len > minified::TREE_SITTER_FILE_SIZE_CAP {
                 return ignore::WalkState::Continue;
             }
 
@@ -577,12 +611,13 @@ pub fn search_callers_structured(
     bloom: &crate::index::bloom::BloomFilterCache,
     context: Option<&Path>,
 ) -> Result<CallerSearchResult, DrailError> {
-    let callers = find_callers(target, scope, bloom)?;
+    let (callers, text_fallback_used) = find_callers(target, scope, bloom)?;
 
     if callers.is_empty() {
         return Ok(CallerSearchResult {
             callers: Vec::new(),
             impact: Vec::new(),
+            text_fallback_used,
         });
     }
 
@@ -591,7 +626,7 @@ pub fn search_callers_structured(
 
     let all_caller_names: HashSet<String> = sorted_callers
         .iter()
-        .filter(|c| c.calling_function != "<top-level>")
+        .filter(|c| c.calling_function != "<top-level>" && c.calling_function != "<text-fallback>")
         .map(|c| c.calling_function.clone())
         .collect();
 
@@ -607,7 +642,8 @@ pub fn search_callers_structured(
         })
         .collect::<Vec<_>>();
 
-    let impact = if !all_caller_names.is_empty()
+    let impact = if !text_fallback_used
+        && !all_caller_names.is_empty()
         && all_caller_names.len() <= IMPACT_FANOUT_THRESHOLD
     {
         match find_callers_batch(&all_caller_names, scope, bloom) {
@@ -647,7 +683,11 @@ pub fn search_callers_structured(
         Vec::new()
     };
 
-    Ok(CallerSearchResult { callers, impact })
+    Ok(CallerSearchResult {
+        callers,
+        impact,
+        text_fallback_used,
+    })
 }
 
 /// Simple ranking: context file first, then by path length (proximity heuristic).

@@ -102,6 +102,7 @@ pub struct SearchResult {
     pub total_found: usize,
     pub definitions: usize,
     pub usages: usize,
+    pub text_fallback_used: bool,
 }
 
 /// A single entry in a code outline.

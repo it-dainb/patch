@@ -1,3 +1,5 @@
+pub const TREE_SITTER_FILE_SIZE_CAP: u64 = 500_000;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Profile {
     pub byte_len: usize,

@@ -384,6 +384,69 @@ fn text_output_renders_none_for_empty_next_and_diagnostics() {
 }
 
 #[test]
+fn text_output_omits_placeholder_success_hints() {
+    let output = run_drail([
+        "symbol",
+        "find",
+        "stableEntryPoint",
+        "--scope",
+        "tests/fixtures/minified",
+    ]);
+
+    assert_success(&output);
+    let text = stdout(&output);
+    assert_text_section_order_v2(&text);
+
+    let diagnostics_block = text
+        .split("## Diagnostics\n")
+        .nth(1)
+        .unwrap_or_else(|| panic!("expected Diagnostics section:\n{text}"));
+
+    assert!(
+        diagnostics_block.contains("text_fallback_used"),
+        "expected diagnostics to include text_fallback_used warning code: {text}"
+    );
+    assert!(
+        !diagnostics_block.contains("[code: success]"),
+        "expected placeholder success hint code to be absent: {text}"
+    );
+    assert!(
+        !diagnostics_block.contains("- hint:"),
+        "expected placeholder success hints to be absent in successful output with real warnings: {text}"
+    );
+
+    let levels: Vec<&str> = diagnostics_block
+        .lines()
+        .filter_map(|line| {
+            if line.starts_with("- error:") {
+                Some("error")
+            } else if line.starts_with("- warning:") {
+                Some("warning")
+            } else if line.starts_with("- hint:") {
+                Some("hint")
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert!(!levels.is_empty(), "expected diagnostics entries: {text}");
+
+    let severity_rank = |level: &str| match level {
+        "error" => 0,
+        "warning" => 1,
+        "hint" => 2,
+        _ => 3,
+    };
+
+    for pair in levels.windows(2) {
+        assert!(
+            severity_rank(pair[0]) <= severity_rank(pair[1]),
+            "expected diagnostics sorted by severity (error, warning, hint): {text}"
+        );
+    }
+}
+
+#[test]
 fn json_errors_use_schema_version_2() {
     let value = run_drail_json_failure(["search", "regex", "(", "--scope", "src", "--json"]);
     assert_v2_envelope(&value, "search.regex");

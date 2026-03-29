@@ -1,6 +1,6 @@
 use std::fs;
 use std::path::Path;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Mutex;
 use std::time::SystemTime;
 
@@ -45,7 +45,7 @@ pub fn search(
     );
 
     let defs = defs?;
-    let usages = usages?;
+    let (usages, text_fallback_used) = usages?;
 
     // Deduplicate: remove usage matches that overlap with definition matches.
     // Linear scan — max ~30 defs from EARLY_QUIT_THRESHOLD, no allocation needed.
@@ -74,6 +74,7 @@ pub fn search(
         total_found: total,
         definitions: def_count,
         usages: usage_count,
+        text_fallback_used,
     })
 }
 
@@ -114,13 +115,6 @@ fn find_definitions(query: &str, scope: &Path) -> Result<Vec<Match>, DrailError>
 
             let path = entry.path();
 
-            // Skip oversized files — avoid tree-sitter parsing multi-MB minified bundles
-            if let Ok(meta) = std::fs::metadata(path) {
-                if meta.len() > 500_000 {
-                    return ignore::WalkState::Continue;
-                }
-            }
-
             // Single read: read file once, use buffer for both check and parse
             let Ok(content) = fs::read_to_string(path) else {
                 return ignore::WalkState::Continue;
@@ -140,6 +134,11 @@ fn find_definitions(query: &str, scope: &Path) -> Result<Vec<Match>, DrailError>
                 FileType::Code(l) => Some(l),
                 _ => None,
             };
+
+            let file_len = content.len() as u64;
+            if super::fallback::should_use_text_fallback(file_len, &content, lang) {
+                return ignore::WalkState::Continue;
+            }
 
             let ts_language = lang.and_then(outline_language);
 
@@ -359,16 +358,18 @@ fn find_usages(
     query: &str,
     matcher: &RegexMatcher,
     scope: &Path,
-) -> Result<Vec<Match>, DrailError> {
+) -> Result<(Vec<Match>, bool), DrailError> {
     let matches: Mutex<Vec<Match>> = Mutex::new(Vec::new());
     // Relaxed: same reasoning as find_definitions — approximate early-quit, joined before read
     let found_count = AtomicUsize::new(0);
+    let text_fallback_used = AtomicBool::new(false);
 
     let walker = super::walker(scope);
 
     walker.run(|| {
         let matches = &matches;
         let found_count = &found_count;
+        let text_fallback_used = &text_fallback_used;
 
         Box::new(move |entry| {
             // Early termination: enough usages found
@@ -386,14 +387,46 @@ fn find_usages(
 
             let path = entry.path();
 
-            // Skip oversized files
-            if let Ok(meta) = std::fs::metadata(path) {
-                if meta.len() > 500_000 {
-                    return ignore::WalkState::Continue;
-                }
-            }
-
             let (file_lines, mtime) = file_metadata(path);
+            let file_type = detect_file_type(path);
+            let lang = match file_type {
+                FileType::Code(l) => Some(l),
+                _ => None,
+            };
+
+            let Ok(content) = fs::read_to_string(path) else {
+                return ignore::WalkState::Continue;
+            };
+
+            let file_len = content.len() as u64;
+            if super::fallback::should_use_text_fallback(file_len, &content, lang) {
+                let file_matches = super::fallback::query_centered_matches(&content, query)
+                    .into_iter()
+                    .map(|(line, snippet)| Match {
+                        path: path.to_path_buf(),
+                        line,
+                        text: snippet,
+                        is_definition: false,
+                        exact: true,
+                        file_lines,
+                        mtime,
+                        def_range: None,
+                        def_name: None,
+                        def_weight: 0,
+                        impl_target: None,
+                    })
+                    .collect::<Vec<_>>();
+
+                if !file_matches.is_empty() {
+                    text_fallback_used.store(true, Ordering::Relaxed);
+                    found_count.fetch_add(file_matches.len(), Ordering::Relaxed);
+                    let mut all = matches
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner);
+                    all.extend(file_matches);
+                }
+                return ignore::WalkState::Continue;
+            }
 
             let mut file_matches = Vec::new();
             let mut searcher = Searcher::new();
@@ -431,9 +464,10 @@ fn find_usages(
         })
     });
 
-    Ok(matches
+    let all_matches = matches
         .into_inner()
-        .unwrap_or_else(std::sync::PoisonError::into_inner))
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    Ok((all_matches, text_fallback_used.load(Ordering::Relaxed)))
 }
 
 /// Keyword heuristic fallback — only used when tree-sitter grammar unavailable.
