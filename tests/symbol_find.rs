@@ -1,7 +1,10 @@
+use std::env;
 use std::ffi::OsStr;
+use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::Output;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use assert_cmd::Command;
 use serde_json::Value;
@@ -96,6 +99,74 @@ fn matches(value: &Value) -> &[Value] {
             serde_json::to_string_pretty(value).expect("json value should serialize")
         )
     })
+}
+
+fn diagnostics(value: &Value) -> &[Value] {
+    value["diagnostics"].as_array().unwrap_or_else(|| {
+        panic!(
+            "expected diagnostics array, got:\n{}",
+            serde_json::to_string_pretty(value).expect("json value should serialize")
+        )
+    })
+}
+
+fn evidence_block(text: &str) -> &str {
+    text.split("## Evidence\n")
+        .nth(1)
+        .and_then(|section| section.split("\n\n## Next\n").next())
+        .unwrap_or_else(|| panic!("expected Evidence section: {text}"))
+}
+
+fn diagnostics_block(text: &str) -> &str {
+    text.split("## Diagnostics\n")
+        .nth(1)
+        .unwrap_or_else(|| panic!("expected Diagnostics section: {text}"))
+}
+
+fn unique_temp_dir(label: &str) -> PathBuf {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("clock should be after unix epoch")
+        .as_nanos();
+    env::temp_dir().join(format!(
+        "drail-symbol-find-{label}-{}-{nanos}",
+        std::process::id()
+    ))
+}
+
+struct TempDir {
+    path: PathBuf,
+}
+
+impl TempDir {
+    fn new(label: &str) -> Self {
+        let path = unique_temp_dir(label);
+        fs::create_dir_all(&path).expect("temp dir should be created");
+        Self { path }
+    }
+
+    fn path(&self) -> &Path {
+        &self.path
+    }
+}
+
+impl Drop for TempDir {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.path);
+    }
+}
+
+fn write_oversized_minified_fixture(dir: &Path, query: &str) -> (PathBuf, String) {
+    let path = dir.join("bundle.min.js");
+    let mut full_line = String::new();
+    while full_line.len() <= 550_000 {
+        full_line.push_str("const fillerValue=1234567890;");
+    }
+    full_line.push_str(&format!(
+        "export function {query}(n){{return n+1}}{query}(5);"
+    ));
+    fs::write(&path, format!("{full_line}\n")).expect("oversized fixture should be written");
+    (path, full_line)
 }
 
 #[test]
@@ -329,5 +400,141 @@ fn symbol_find_scope_dot_uses_invoking_cwd() {
             .iter()
             .any(|entry| { entry["kind"] == "usage" && entry["path"] == "visible_caller.rs" }),
         "expected visible_caller usage in scope-relative results: {value:#}"
+    );
+}
+
+#[test]
+fn symbol_find_minified_fallback_returns_usage_only_snippets() {
+    let value = run_drail_json([
+        "symbol",
+        "find",
+        "stableEntryPoint",
+        "--scope",
+        "tests/fixtures/minified",
+        "--json",
+    ]);
+    let fixture = include_str!("fixtures/minified/app.min.js").trim_end();
+    let matches = matches(&value);
+
+    assert_eq!(value["ok"], true);
+    assert!(
+        !matches.is_empty(),
+        "expected text fallback results for minified fixture: {value:#}"
+    );
+    assert!(
+        matches.iter().all(|entry| entry["kind"] == "usage"),
+        "expected fallback matches to keep usage kind only: {value:#}"
+    );
+
+    for entry in matches {
+        let snippet = entry["snippet"].as_str().unwrap_or_else(|| {
+            panic!(
+                "expected fallback snippet text string, got:\n{}",
+                serde_json::to_string_pretty(entry).expect("json value should serialize")
+            )
+        });
+        assert!(
+            snippet.contains("stableEntryPoint"),
+            "expected fallback snippet to contain query token: {entry:#}"
+        );
+        assert!(
+            snippet.len() < fixture.len(),
+            "expected fallback snippet shorter than original one-line fixture"
+        );
+    }
+
+    let fallback_warnings = diagnostics(&value)
+        .iter()
+        .filter(|diag| diag["level"] == "warning" && diag["code"] == "text_fallback_used")
+        .count();
+    assert_eq!(
+        fallback_warnings, 1,
+        "expected one text fallback warning: {value:#}"
+    );
+}
+
+#[test]
+fn symbol_find_oversized_minified_bundle_uses_text_fallback() {
+    let temp_dir = TempDir::new("oversized-minified-fallback");
+    let (_, full_line) = write_oversized_minified_fixture(temp_dir.path(), "oversizedEntryPoint");
+
+    let value = run_drail_json_from(
+        [
+            "symbol",
+            "find",
+            "oversizedEntryPoint",
+            "--scope",
+            ".",
+            "--json",
+        ],
+        temp_dir.path(),
+    );
+    let matches = matches(&value);
+
+    assert_eq!(value["ok"], true);
+    assert!(
+        !matches.is_empty(),
+        "expected oversized minified fallback result instead of silent skip: {value:#}"
+    );
+    assert!(
+        matches.iter().all(|entry| entry["kind"] == "usage"),
+        "expected fallback matches to keep usage kind only: {value:#}"
+    );
+
+    for entry in matches {
+        let snippet = entry["snippet"].as_str().unwrap_or_else(|| {
+            panic!(
+                "expected fallback snippet text string, got:\n{}",
+                serde_json::to_string_pretty(entry).expect("json value should serialize")
+            )
+        });
+        assert!(
+            snippet.contains("oversizedEntryPoint"),
+            "expected fallback snippet to contain query token: {entry:#}"
+        );
+        assert!(
+            snippet.len() < full_line.len(),
+            "expected fallback snippet shorter than original one-line oversized fixture"
+        );
+    }
+
+    let fallback_warnings = diagnostics(&value)
+        .iter()
+        .filter(|diag| diag["level"] == "warning" && diag["code"] == "text_fallback_used")
+        .count();
+    assert_eq!(
+        fallback_warnings, 1,
+        "expected one text fallback warning: {value:#}"
+    );
+}
+
+#[test]
+fn symbol_find_text_output_minified_fallback_hides_raw_line_and_warns() {
+    let output = run_drail([
+        "symbol",
+        "find",
+        "stableEntryPoint",
+        "--scope",
+        "tests/fixtures/minified",
+    ]);
+    let text = stdout(&output);
+    let fixture = include_str!("fixtures/minified/app.min.js").trim_end();
+
+    assert_success(&output);
+
+    let evidence = evidence_block(&text);
+    assert!(
+        evidence.contains("stableEntryPoint"),
+        "expected fallback evidence to include query token: {text}"
+    );
+    assert!(
+        !evidence.contains(fixture),
+        "expected fallback evidence to avoid full raw minified line: {text}"
+    );
+
+    let diagnostics = diagnostics_block(&text);
+    assert!(
+        diagnostics.contains("text_fallback_used"),
+        "expected diagnostics to include text_fallback_used warning code: {text}"
     );
 }
